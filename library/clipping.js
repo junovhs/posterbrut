@@ -4,7 +4,7 @@ export function clipChain(layer,layers){
   while(id){if(seen.has(id))return null;seen.add(id);const target=byId.get(id);if(!target)break;chain.push(target);id=target.clipTo;}
   return chain;
 }
-export function canClipTo(layer,target,layers){return target.id!==layer.id&&['image','shape'].includes(target.type)&&clipChain({...layer,clipTo:target.id},layers)!==null;}
+export function canClipTo(layer,target,layers){return target.id!==layer.id&&['image','shape','paint'].includes(target.type)&&clipChain({...layer,clipTo:target.id},layers)!==null;}
 export function worldBounds(layer){
   const a=(layer.angle||0)*Math.PI/180,c=Math.cos(a),s=Math.sin(a),pad=layer.type==='shape'?(layer.strokeWidth||0)/2:0,points=[[-pad,-pad],[layer.w+pad,-pad],[-pad,layer.h+pad],[layer.w+pad,layer.h+pad]].map(([x,y])=>[layer.x+x*c-y*s,layer.y+x*s+y*c]);
   return {x:Math.min(...points.map(p=>p[0])),y:Math.min(...points.map(p=>p[1])),right:Math.max(...points.map(p=>p[0])),bottom:Math.max(...points.map(p=>p[1]))};

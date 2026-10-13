@@ -26,7 +26,7 @@ Open http://127.0.0.1:8046/. Deploy the generated `dist/` directory as a static 
 
 ## Shortcuts
 
-`V` select · `H` pan · `T` text · `R` rectangle · `O` ellipse · `L` freehand lasso · `E` erase mask (`B` also works) · `G` restore mask · `Delete` remove layer · `Ctrl/Cmd + Z` undo · `Ctrl/Cmd + Shift + Z` redo · `Ctrl/Cmd + S` save.
+`V` select · `H` pan · `T` text · `R` rectangle · `O` ellipse · `L` freehand lasso · `B` / `P` paint · `E` erase paint or image mask · `G` restore mask · `Delete` remove layer · `Ctrl/Cmd + Z` undo · `Ctrl/Cmd + Shift + Z` redo · `Ctrl/Cmd + S` save.
 
 Use the **Layers** panel to select which image a cutout applies to. With an image selected, press **L**, trace the outline of the subject in a single pointer gesture, and release to complete it. Refine with **E** / **G**.
 
@@ -100,3 +100,11 @@ Tool buttons show descriptive help on hover and keyboard focus. Tool shortcuts w
 ### Clipping masks
 
 Select a shape or image and choose **Clip to** under Compositing. Its visible alpha is limited to the target image’s printed silhouette or the target shape. Move, rotate or resize either layer to update the intersection; the link survives undo, saved projects and full-resolution PNG export. Clipping can be chained; cyclic choices are excluded. Hiding a target hides its clipped contents; deleting it removes dependent links. Cropped native canvas surfaces are cached with a pixel-area limit, so stable frames do not repeat clipping work or pixel processing.
+
+### Tiptop painting
+
+Press **B** (or **P**) and draw. The editor creates a paint layer, or appends to the selected paint layer. Select one of 13 original presets from Master Ink and Real Spray Paint in the brush inspector; adjust size, flow, and color. **E** erases paint; **[ / ]** resize the brush. Paint layers can move, resize, rotate, blend, and clip to images/shapes/other paint layers. Each stroke preserves its preset, color, pressure, and seed for undo, project save/load, and resolution-independent PNG export.
+
+Tips and grain textures were recovered from the owner’s locally synced Dropbox **Tiptop Brushes/Vault** and packaged as lossless WebP assets (512px maximum). The catalog preserves original spacing, scatter, jitter, tip/grain inversion, and pressure curves, with a small spacing floor to keep drawing responsive. A dedicated worker prepares and caches tips, then appends only newly sampled dabs to persistent stroke surfaces; exports use a separate paint worker. Stable paint frames are reused, and caches are bounded. These are browser adaptations of the original assets and supported dynamics; Procreate’s proprietary wet-paint, smudge, stabilization, and blending engines are not reproduced.
+
+Asset provenance and source/output SHA-256 hashes are in `assets/brushes/provenance.json`. To repeat the read-only extraction, run `python scripts/import-tiptop-brushes.py /path/to/Tiptop\ Brushes/Vault` with Pillow installed. Originals in Dropbox are left intact.
