@@ -10,16 +10,22 @@ const bayer=[0,48,12,60,3,51,15,63,32,16,44,28,35,19,47,31,8,56,4,52,11,59,7,55,
 export function integral(plane:Float32Array,w:number,h:number,squared=false):Float64Array{const a=new Float64Array((w+1)*(h+1));for(let y=0;y<h;y++){let sum=0;for(let x=0;x<w;x++){const v=plane[y*w+x]!;sum+=squared?v*v:v;a[(y+1)*(w+1)+x+1]=a[y*(w+1)+x+1]!+sum;}}return a;}
 function mean(a:Float64Array,x:number,y:number,r:number,w:number,h:number):number{const x0=Math.max(0,x-r),x1=Math.min(w-1,x+r),y0=Math.max(0,y-r),y1=Math.min(h-1,y+r),s=w+1;return (a[(y1+1)*s+x1+1]!-a[y0*s+x1+1]!-a[(y1+1)*s+x0]!+a[y0*s+x0]!)/((x1-x0+1)*(y1-y0+1));}
 export function autoThreshold(hist:readonly number[]):number{const total=hist.reduce((a,b)=>a+b,0);if(!total)return 128;const sum=hist.reduce((a,b,i)=>a+b*i,0);let weight=0,partial=0,best=-1,first=128,last=128;for(let t=0;t<255;t++){weight+=hist[t]||0;partial+=t*(hist[t]||0);if(!weight||weight===total)continue;const delta=partial/weight-(sum-partial)/(total-weight),variance=weight*(total-weight)*delta*delta;if(variance>best){best=variance;first=last=t;}else if(variance===best)last=t;}return best<0?Math.round(sum/total):Math.round((first+last)/2)+1;}
+/** An alpha-aware tone percentile, interpolated within the occupied bin. */
+function percentile(hist:readonly number[],fraction:number):number{const total=hist.reduce((a,b)=>a+b,0);if(!total)return 128;const target=clamp(fraction,0,1)*total;let count=0;for(let i=0;i<256;i++){const n=hist[i]||0;if(n&&count+n>=target)return clamp(i-.5+(target-count)/n,0,255);count+=n;}return 255;}
 /** Cached immutable source analysis; slider changes reuse its luminance and integral. */
 export class PreparedImage {
- readonly lum:Float32Array;readonly sums:Float64Array;
- constructor(readonly frame:Frame){this.lum=new Float32Array(frame.width*frame.height);for(let i=0;i<this.lum.length;i++){const k=i*4;this.lum[i]=frame.rgba[k]!*.2126+frame.rgba[k+1]!*.7152+frame.rgba[k+2]!*.0722;}this.sums=integral(this.lum,frame.width,frame.height);}
+ readonly lum:Float32Array;readonly sums:Float64Array;readonly sourceHistogram=new Array<number>(256).fill(0);
+ constructor(readonly frame:Frame){this.lum=new Float32Array(frame.width*frame.height);for(let i=0;i<this.lum.length;i++){const k=i*4;this.lum[i]=frame.rgba[k]!*.2126+frame.rgba[k+1]!*.7152+frame.rgba[k+2]!*.0722;}for(let i=0;i<this.lum.length;i++)if(frame.rgba[i*4+3]!>=5)this.sourceHistogram[Math.round(this.lum[i]!)]!++;this.sums=integral(this.lum,frame.width,frame.height);}
  render(input:Partial<Effects>,seed=0):{rgba:Uint8ClampedArray<ArrayBuffer>;analysis:Analysis}{
   const started=performance.now(),fx=effects(input),{width:w,height:h,rgba:source}=this.frame;
+  // DEC-01: Source normalization and macro mapping stay inside the worker kernel.
+  const macro=fx.feelInk!==undefined;
+  if(macro){const texture=clamp(fx.feelTexture??.25,0,1),lo=percentile(this.sourceHistogram,.02),hi=percentile(this.sourceHistogram,.98);fx.blackPoint=lo;fx.whitePoint=Math.max(lo+1,hi);fx.contrast=100;fx.brightness=0;fx.gamma=100;fx.adaptive=0;fx.denoise=0;fx.sharpen=texture*18;fx.grain=texture*65;fx.grit=texture*38;fx.grainSize=25+texture*30;fx.inkDensity=100-texture*12;}
   const tone=new Float32Array(w*h),hist=new Array<number>(256).fill(0),lut=new Float32Array(4096);
   for(let i=0;i<lut.length;i++){let v=clamp((i/4095*255-fx.blackPoint)*255/(fx.whitePoint-fx.blackPoint),0,255);v=clamp(128+(v-128)*fx.contrast/100+fx.brightness*1.5,0,255);v=255*Math.pow(v/255,fx.gamma/100);lut[i]=fx.invert?255-v:v;}
   const denoise=fx.denoise/100,sharp=fx.sharpen/100;
   for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x;let value=this.lum[i]!;if(denoise||sharp){const nearby=mean(this.sums,x,y,Math.max(1,Math.round(1+fx.denoise/25)),w,h);value=value*(1-denoise)+nearby*denoise+sharp*(value-nearby)*1.6;}value=lut[Math.round(clamp(value,0,255)/255*4095)]!;tone[i]=value;if(source[i*4+3]!>=5)hist[clamp(Math.round(value),0,255)]!++;}
+  if(macro)fx.threshold=percentile(hist,.04+clamp(fx.feelInk??.5,0,1)*.92);
   const sums=fx.adaptive?integral(tone,w,h):null,squares=fx.adaptive&&fx.localMethod==='sauvola'?integral(tone,w,h,true):null;
   const out=new Uint8ClampedArray(source.length),ink=rgb(fx.ink),second=rgb(fx.secondInk);
   const grain=fx.grain/100,grit=fx.grit/100,adaptive=fx.adaptive/100,angle=fx.angle*Math.PI/180,sa=Math.sin(angle),ca=Math.cos(angle),size=Math.max(2,24-fx.halftone*1.7);let printedCount=0,opaque=0;
@@ -37,6 +43,6 @@ export class PreparedImage {
    if(grit||fx.inkDensity<100){const edge=clamp(1-Math.abs(lum-threshold)/72,0,1),test=hash(x,y,seed+207)*.72+noise(x/(2+fx.grainSize*.06),y/(2+fx.grainSize*.06),seed+211)*.28;if(test<(1-fx.inkDensity/100)*.88+grit*(.009+edge*.087))continue;}
    const color=secondary?second:ink;out[i]=color[0]!;out[i+1]=color[1]!;out[i+2]=color[2]!;out[i+3]=255;printedCount++;
   }
-  return {rgba:out,analysis:{histogram:hist,coverage:opaque?printedCount/opaque*100:0,autoThreshold:autoThreshold(hist),ms:performance.now()-started}};
+  return {rgba:out,analysis:{sourceHistogram:this.sourceHistogram,histogram:hist,coverage:opaque?printedCount/opaque*100:0,autoThreshold:autoThreshold(hist),ms:performance.now()-started}};
  }
 }

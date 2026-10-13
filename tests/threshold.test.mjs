@@ -15,3 +15,6 @@ test('analysis cache is immutable across detail settings',()=>{const p=image(Arr
 test('zero density removes every ink pixel',()=>{const p=image(new Array(4096).fill(0),64);assert.ok(alphas(p.render({...clean,inkDensity:0,grain:50,grit:25})).every(v=>v===0));});
 
 test('manual cutoff remains effective at full local strength',()=>{const p=image(Array.from({length:256},(_,i)=>i%16*12+20),16);assert.notDeepEqual(alphas(p.render({...clean,adaptive:100,threshold:80})),alphas(p.render({...clean,adaptive:100,threshold:180})));});
+
+test('ink feel adapts dark and light sources to comparable coverage',()=>{const ramp=Array.from({length:256},(_,i)=>i);const dark=image(ramp.map(v=>20+v*.2)),light=image(ramp.map(v=>180+v*.2));for(const feelInk of [.1,.5,.9]){const a=dark.render({feelInk,feelTexture:0}),b=light.render({feelInk,feelTexture:0});assert.ok(Math.abs(a.analysis.coverage-b.analysis.coverage)<3);assert.ok(Math.abs(a.analysis.coverage-(4+feelInk*92))<3);}});
+test('original tone feedback remains stable across extreme effects',()=>{const p=image(Array.from({length:256},(_,i)=>i));const a=p.render({threshold:10,contrast:350}),b=p.render({feelInk:.9,feelTexture:1});assert.deepEqual(a.analysis.sourceHistogram,b.analysis.sourceHistogram);assert.equal(a.analysis.sourceHistogram.filter(Boolean).length,256);assert.notDeepEqual(a.rgba,b.rgba);});

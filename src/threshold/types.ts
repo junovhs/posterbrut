@@ -1,12 +1,13 @@
 export type Mode='threshold'|'dither'|'halftone'|'duotone';
 export interface Effects {
+ feelInk?:number;feelTexture?:number;
  mode:Mode;threshold:number;contrast:number;brightness:number;gamma:number;adaptive:number;
  grain:number;grainSize:number;grit:number;inkDensity:number;invert:boolean;
  ink:string;secondInk:string;dither:number;halftone:number;angle:number;
  blackPoint:number;whitePoint:number;denoise:number;sharpen:number;
  localRadius:number;localBias:number;localMethod:'mean'|'sauvola';
 }
-export interface Analysis {histogram:number[];coverage:number;autoThreshold:number;ms:number}
+export interface Analysis {sourceHistogram:number[];histogram:number[];coverage:number;autoThreshold:number;ms:number}
 export interface Frame {width:number;height:number;rgba:Uint8ClampedArray}
 export type Task =
  |{kind:'image';fx:Partial<Effects>;seed:number;analysisOnly?:boolean}

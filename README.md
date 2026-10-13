@@ -63,18 +63,7 @@ swap its source while keeping its position, dimensions, masks, print settings,
 opacity, and blend mode. Replacement supports undo/redo and leaves the existing
 image intact if the new file cannot be decoded.
 
-## Precision threshold inspector
-
-Select an image to get the effect controls directly below **Replace image**. Each
-main slider has a numeric field: threshold uses 0.1 increments. **Auto threshold**
-uses Otsu separation on the current tone-adjusted histogram. Clean, Photocopy,
-Detail, and Linework are starting points; Hold Original compares the untreated
-source while held (mouse, touch, Space, or Enter).
-
-Open **Levels & Detail** for black/white levels, denoising, and detail boost.
-**Local Threshold** adds strength, neighborhood size, bias, and local mean or
-Sauvola processing for uneven lighting. Ink colors, grain, density, existing print
-modes, masks, blending, and editable project files remain available.
+## Image print engine
 
 The new engine lives in strict TypeScript under `src/threshold/`. The existing
 editor shell is JavaScript. A module worker owns source analysis and pixel loops;
@@ -99,3 +88,9 @@ Use `PORT` to change the port. `pnpm build` generates the static output; Vercel
 uses that build command and the `dist` output directory from `vercel.json`.
 No runtime packages are added. `@napi-rs/canvas` is only a development test adapter.
 Ishoo's durable issue store remains synced separately from source on `refs/ishoo/store`.
+
+### Ink feel
+
+Select an image and drag the Ink feel pad: left/right changes how much ink prints; down adds worn grain and erosion. New images fit automatically. Auto fit recenters the pad; Hold original compares with the source. Arrow keys adjust the focused pad (Shift for larger moves). Print style and color live in one optional disclosure. The tone display describes the original selected source, using square-root scaling so smaller tone populations remain visible. Existing projects keep their exact older effect until you use the pad.
+
+The worker normalizes the source using alpha-aware 2nd/98th tone percentiles and maps ink amount to a tone percentile, so exposure varies without making the control unusable. Texture coordinates drive detail, grain, erosion and density together. Both coordinates are saved non-destructively in the project.

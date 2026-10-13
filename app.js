@@ -17,7 +17,7 @@ const esc = t => String(t).replaceAll('&','&amp;').replaceAll('<','&lt;').replac
 const f = (n,d=0)=>Number(n).toFixed(d);
 const defaultFX = ()=>({...printDefaults,mode:'threshold',ink:'#161514',secondInk:'#e0be60',threshold:130,contrast:165,brightness:0,gamma:100,adaptive:0,grain:53,grainSize:42,grit:23,dither:46,halftone:9,angle:34,roughness:32,inkDensity:100,invert:false});
 const defaultMask = ()=>({type:'none',points:[],roughness:30,strokes:[]});
-const mkImage = (src,name,x=80,y=110,w=560,h=560)=>({id:uid(),type:'image',name,visible:true,locked:false,x,y,w,h,angle:0,opacity:100,blend:'source-over',src,fx:defaultFX(),mask:defaultMask()});
+const mkImage = (src,name,x=80,y=110,w=560,h=560)=>({id:uid(),type:'image',name,visible:true,locked:false,x,y,w,h,angle:0,opacity:100,blend:'source-over',src,fx:{...defaultFX(),feelInk:.5,feelTexture:.25},mask:defaultMask()});
 const mkText = (text,x,y,size=82)=>({id:uid(),type:'text',name:text.replace(/\n/g,' ').slice(0,25)||'Type',visible:true,locked:false,x,y,w:400,h:size,angle:0,opacity:100,blend:'source-over',text,font:'Anton',fontSize:size,weight:400,color:'#191817',tracking:0,stretch:100,lineHeight:100,distress:0,align:'left',outline:0});
 const mkShape = (type,x,y,w,h)=>({id:uid(),type:'shape',name:type==='ellipse'?'Ellipse':'Rectangle',shape:type,visible:true,locked:false,x,y,w,h,angle:0,opacity:100,blend:'source-over',fill:'#151616',stroke:'#f2e7da',strokeWidth:0});
 const demo = ()=>{
@@ -163,22 +163,22 @@ function compositionInspector(l){return section('02 — COMPOSITING',`${range('l
 function fxControl(key,title,min,max,step=1,unit=''){
   const path='layer.fx.'+key,value=prop(path);return `<div class="fx-control"><label>${title}<span>${unit}</span></label><div><input type="range" aria-label="${title}" data-prop="${path}" min="${min}" max="${max}" step="${step}" value="${value}"><input type="number" aria-label="${title} value" data-prop="${path}" min="${min}" max="${max}" step="${step}" value="${value}"></div></div>`;
 }
-function updateAnalysisUI(){const l=selected(),analysis=l&&imageAnalysis.get(l.id),root=$('#fx-histogram');if(!analysis||!root)return;
-  const max=Math.max(1,...analysis.histogram);root.innerHTML=analysis.histogram.map((count,i)=>`<rect x="${i}" y="${40-count/max*40}" width="1" height="${count/max*40}"/>`).join('')+`<line x1="${l.fx.threshold}" x2="${l.fx.threshold}" y1="0" y2="40"/>`;
-  $('#fx-status').textContent=`${analysis.coverage.toFixed(1)}% INK · LIVE PREVIEW`;
+function updateAnalysisUI(){const l=selected(),analysis=l&&imageAnalysis.get(l.id),status=$('#fx-status');if(!status)return;
+  if(!analysis){status.textContent='Reading this image…';return;}
+  status.textContent=`${Math.round(analysis.coverage)}% ink · ${l.name}`;
+  const bars=$('#fx-source-tones');if(bars){const hist=analysis.sourceHistogram,max=Math.max(1,...hist);bars.innerHTML=hist.map((count,i)=>`<rect x="${i}" y="${24-Math.sqrt(count/max)*24}" width="1" height="${Math.sqrt(count/max)*24}"/>`).join('');}
 }
-const fxPresets={clean:{...printDefaults,grain:0,grit:0,contrast:100},photocopy:{...printDefaults,grain:10,grit:5,contrast:180,threshold:140},detail:{...printDefaults,grain:0,grit:0,contrast:110,adaptive:65,localMethod:'sauvola',localRadius:24,sharpen:20},linework:{...printDefaults,grain:0,grit:0,contrast:150,threshold:110,adaptive:75,localRadius:16,localBias:-12,denoise:15}};
-function fxInspector(l){return section('THRESHOLD / PRINT EFFECT',`<div class="mode-grid">${[['threshold','THRESH'],['dither','DITHER'],['halftone','HALFTONE'],['duotone','2-TONE']].map(([mode,label])=>`<button class="${l.fx.mode===mode?'active':''}" data-mode="${mode}">${label}</button>`).join('')}</div>
-    <svg id="fx-histogram" class="fx-histogram" viewBox="0 0 256 40" role="img" aria-label="Image tone histogram and threshold position"></svg><div id="fx-status" class="section-note" role="status">Updating preview…</div>
-    ${fxControl('threshold','Threshold',0,255,.1)}<div class="button-row"><button class="outline-button" id="fx-auto">AUTO THRESHOLD</button><button class="outline-button" id="fx-compare" aria-pressed="false">HOLD ORIGINAL</button></div>
-    <div class="fx-presets">${[['clean','CLEAN'],['photocopy','PHOTOCOPY'],['detail','DETAIL'],['linework','LINEWORK']].map(([key,label])=>`<button data-fx-preset="${key}" class="outline-button">${label}</button>`).join('')}</div>
-    ${fxControl('contrast','Contrast',10,350,1,'%')}${fxControl('brightness','Exposure',-100,100,.1)}${fxControl('gamma','Gamma',20,300,1,'%')}
-    <details class="fx-details"><summary>LEVELS & DETAIL</summary>${fxControl('blackPoint','Black point',0,254)}${fxControl('whitePoint','White point',1,255)}${fxControl('denoise','Denoise',0,100,1,'%')}${fxControl('sharpen','Detail boost',0,100,1,'%')}</details>
-    <details class="fx-details" ${l.fx.adaptive?'open':''}><summary>LOCAL THRESHOLD</summary>${fxControl('adaptive','Local strength',0,100,1,'%')}${selectField('layer.fx.localMethod','Method',[['mean','Local mean'],['sauvola','Detail / Sauvola']])}${fxControl('localRadius','Neighborhood',1,128,1,'px')}${fxControl('localBias','Local bias',-100,100,.1)}<p class="section-note">Local threshold follows uneven lighting. Neighborhood controls the size of detail; bias adds or removes ink.</p></details>
-    ${color('layer.fx.ink','Primary ink')}${l.fx.mode==='duotone'?color('layer.fx.secondInk','Secondary ink'):''}
-    <label class="ins-row"><span class="ins-label">Invert</span><input type="checkbox" data-prop="layer.fx.invert" ${l.fx.invert?'checked':''}><span class="section-note">Switch positive / negative</span></label><button class="utility-button wide" id="fx-reset">RESET EFFECT</button>`,'LIVE')
-    +section('04 — GRAIN LAB',`${range('layer.fx.grain','Film grain',0,100,1,'%')}${range('layer.fx.grainSize','Grain scale',0,100,1,'%')}${range('layer.fx.grit','Ink erosion',0,100,1,'%')}${range('layer.fx.inkDensity','Ink density',0,100,1,'%')}${l.fx.mode==='dither'?range('layer.fx.dither','Dither matrix',0,100,1,'%'):''}${l.fx.mode==='halftone'?range('layer.fx.halftone','Screen LPI',1,13,1,'')+range('layer.fx.angle','Screen angle',0,90,1,'°'):''}
-    <div class="callout"><strong>100% OPAQUE INK · SPATIALLY THINNED</strong><br>At 60% density, missing pixels show the layers below. Surviving printed pixels retain 255 alpha. Not a transparency hack.</div><div class="button-row"><button class="outline-button" data-action="grain-fine">FINE DUST</button><button class="outline-button" data-action="grain-heavy">ROUGH INK</button></div>`,'PHYSICAL PRINT')
+function fxInspector(l){const x=l.fx.feelInk??.5,y=l.fx.feelTexture??.25;return section('INK FEEL',`
+    <div class="ink-feel-heading"><span>Make your mark.</span><button class="ink-auto" id="fx-auto">↻ AUTO FIT</button></div>
+    <p class="section-note">Drag to find your print. We balance the image for you.</p>
+    <div class="ink-pad" id="ink-pad" role="group" aria-label="Ink feel: horizontal for ink amount, vertical for texture" tabindex="0" style="--ink-x:${x*100}%;--ink-y:${y*100}%">
+      <span class="ink-corner tl">LIGHT / CLEAN</span><span class="ink-corner tr">BOLD / CLEAN</span><span class="ink-corner bl">LIGHT / WORN</span><span class="ink-corner br">BOLD / WORN</span>
+      <i class="ink-pad-dot"></i><span class="ink-pad-caption">${l.fx.feelInk===undefined?'DRAG TO EXPLORE':'YOUR PRINT'}</span>
+    </div>
+    <div class="ink-pad-access"><label>Ink amount<input type="range" id="ink-amount" min="0" max="100" value="${x*100}"></label><label>Texture<input type="range" id="ink-texture" min="0" max="100" value="${y*100}"></label></div>
+    <div class="ink-meter"><svg id="fx-source-tones" viewBox="0 0 256 24" role="img" aria-label="Original image tones, before the ink effect"></svg><div id="fx-status" role="status">Reading this image…</div><span>ORIGINAL IMAGE TONES</span></div>
+    <div class="button-row"><button class="outline-button" id="fx-compare" aria-pressed="false">HOLD ORIGINAL</button><button class="outline-button" id="fx-reset">START FRESH</button></div>
+    <details class="fx-details"><summary>PRINT STYLE & COLOR</summary><div class="mode-grid">${[['threshold','SOLID'],['dither','DITHER'],['halftone','DOTS'],['duotone','2-TONE']].map(([mode,label])=>`<button class="${l.fx.mode===mode?'active':''}" data-mode="${mode}">${label}</button>`).join('')}</div>${color('layer.fx.ink','Ink')}${l.fx.mode==='duotone'?color('layer.fx.secondInk','Second ink'):''}<label class="ins-row"><span class="ins-label">Negative</span><input type="checkbox" data-prop="layer.fx.invert" ${l.fx.invert?'checked':''}></label></details>`,'PLAY')
     +section('05 — CUTOUT / MASK',`<div class="mode-grid"><button data-action="mask-none" class="${l.mask.type==='none'?'active':''}">NO MASK</button><button data-action="mask-rough" class="${l.mask.type==='rough'?'active':''}">ROUGH CUT</button><button data-action="lasso" class="${l.mask.type==='lasso'?'active':''}">LASSO</button></div>
     ${range('layer.mask.roughness','Jagged edge',0,100,1,'%')}<div class="button-row"><button class="outline-button" data-action="mask-erase">− ERASE BRUSH</button><button class="outline-button" data-action="mask-reveal">＋ RESTORE</button></div>
     <div class="ins-row"><span class="ins-label">Brush size</span><input type="range" id="brush-size" min="4" max="240" value="${brushSize}"><span class="ins-value" id="brush-size-label">${brushSize}px</span></div>
@@ -206,9 +206,15 @@ function wireInspector(){inspector.querySelectorAll('[data-prop]').forEach(el=>{
   inspector.querySelectorAll('[data-mode]').forEach(el=>el.addEventListener('click',()=>mutate(()=>{selected().fx.mode=el.dataset.mode;invalidate();},{inspectorRefresh:true})));
   inspector.querySelectorAll('[data-action]').forEach(el=>el.addEventListener('click',()=>runAction(el.dataset.action)));
   updateAnalysisUI();
-  inspector.querySelectorAll('[data-fx-preset]').forEach(button=>button.onclick=()=>{remember(true);mutate(()=>{const l=selected(),ink=l.fx.ink;l.fx={...fxPresets[button.dataset.fxPreset],ink};layerCache.clear();},{historyEntry:false,inspectorRefresh:true});});
-  const reset=$('#fx-reset');if(reset)reset.onclick=()=>{remember(true);mutate(()=>{selected().fx={...printDefaults,grain:0,grit:0,contrast:100};layerCache.clear();},{historyEntry:false,inspectorRefresh:true});};
-  const auto=$('#fx-auto');if(auto)auto.onclick=async()=>{const layer=selected();auto.disabled=true;try{await processedImage(layer,1,true,true);if(selected()===layer){const analysis=imageAnalysis.get(layer.id);if(analysis){remember(true);mutate(()=>{layer.fx.threshold=analysis.autoThreshold;layerCache.clear();},{historyEntry:false,inspectorRefresh:true});}}}catch(error){if(error.name!=='AbortError')notify('AUTO THRESHOLD FAILED');}finally{auto.disabled=false;}};
+  const pad=$('#ink-pad');if(pad){let dragging=false,layer=null;
+    const apply=(x,y)=>{const l=selected();if(!l||l.locked)return;mutate(()=>{l.fx.feelInk=clamp(x,0,1);l.fx.feelTexture=clamp(y,0,1);latestJobs.delete(l.id);layerCache.clear();},{historyEntry:false});pad.style.setProperty('--ink-x',l.fx.feelInk*100+'%');pad.style.setProperty('--ink-y',l.fx.feelTexture*100+'%');$('#ink-amount').value=l.fx.feelInk*100;$('#ink-texture').value=l.fx.feelTexture*100;pad.querySelector('.ink-pad-caption').textContent='YOUR PRINT';};
+    const point=e=>{const r=pad.getBoundingClientRect();apply((e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height);};
+    pad.onpointerdown=e=>{if(e.button!==0||selected()?.locked)return;e.preventDefault();pad.focus();remember(true);dragging=true;layer=selected();pad.setPointerCapture(e.pointerId);point(e);};
+    pad.onpointermove=e=>{if(dragging&&selected()===layer)point(e);};pad.onpointerup=pad.onpointercancel=()=>{dragging=false;};
+    pad.onkeydown=e=>{const delta={ArrowLeft:[-.02,0],ArrowRight:[.02,0],ArrowUp:[0,-.02],ArrowDown:[0,.02]}[e.key];if(!delta)return;e.preventDefault();e.stopPropagation();if(!e.repeat)remember(true);const l=selected();apply((l.fx.feelInk??.5)+delta[0]*(e.shiftKey?5:1),(l.fx.feelTexture??.25)+delta[1]*(e.shiftKey?5:1));};
+    for(const [id,key] of [['ink-amount','feelInk'],['ink-texture','feelTexture']]){const input=$('#'+id);input.onpointerdown=input.onfocus=()=>remember(true);input.oninput=()=>{const l=selected();apply(key==='feelInk'?Number(input.value)/100:l.fx.feelInk??.5,key==='feelTexture'?Number(input.value)/100:l.fx.feelTexture??.25);};}
+    const fit=()=>{if(selected()?.locked)return;remember(true);apply(.5,.25);};$('#fx-auto').onclick=fit;$('#fx-reset').onclick=fit;
+  }
   const compare=$('#fx-compare');if(compare){const show=()=>{compareImageId=selected()?.id;compare.setAttribute('aria-pressed','true');schedule();},hide=()=>{compareImageId=null;compare.setAttribute('aria-pressed','false');schedule();};compare.onpointerdown=show;compare.onpointerup=hide;compare.onpointerleave=hide;compare.onpointercancel=hide;compare.onblur=hide;compare.onkeydown=e=>{if(e.key===' '||e.key==='Enter'){e.preventDefault();show();}};compare.onkeyup=hide;}
   const bs=$('#brush-size');if(bs)bs.addEventListener('input',e=>{brushSize=Number(e.target.value);$('#brush-size-label').textContent=brushSize+'px';});
 }
@@ -274,7 +280,7 @@ async function replaceImage(file,targetId,sequence){
     const src=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(new Error('File could not be read'));reader.readAsDataURL(file);});
     if(!await getImage(src).promise)throw new Error('Image could not be decoded');
     if(sequence!==replacementSequence||project!==data||!data.layers.includes(target)||target.locked||target.src===src)return;
-    remember(true);mutate(()=>{target.src=src;layerCache.clear();},{historyEntry:false,layerRefresh:true,inspectorRefresh:true});notify('IMAGE REPLACED');
+    remember(true);mutate(()=>{target.src=src;imageAnalysis.delete(target.id);latestJobs.delete(target.id);layerCache.clear();},{historyEntry:false,layerRefresh:true,inspectorRefresh:true});notify('IMAGE REPLACED');
   }catch(e){notify('IMAGE NOT REPLACED: '+e.message);}
 }
 function download(blob,filename){const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(url);a.remove();},3000);}
