@@ -1,0 +1,16 @@
+{
+  "name": "inknoise-studio",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.25.0",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "node scripts/clean.mjs && tsc && node scripts/build-static.mjs",
+    "test": "pnpm build && node --test tests/*.test.mjs",
+    "dev": "pnpm build && node scripts/serve.mjs"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "@napi-rs/canvas": "0.1.100"
+  }
+}
