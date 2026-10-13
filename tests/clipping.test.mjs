@@ -1,0 +1,13 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';import{createCanvas}from'@napi-rs/canvas';import{ClipRenderer,clipChain,canClipTo}from'../library/clipping.js';
+const shape=(id,x,y,w,h,extra={})=>({id,type:'shape',x,y,w,h,angle:0,opacity:100,visible:true,...extra});
+const raw=(ctx,l)=>{ctx.save();ctx.translate(l.x,l.y);ctx.rotate((l.angle||0)*Math.PI/180);ctx.fillStyle=l.color||'red';if(l.type==='image'){ctx.fillRect(0,0,l.w/2,l.h);}else ctx.fillRect(0,0,l.w,l.h);ctx.restore();};
+const alpha=(c,x,y)=>c.getContext('2d').getImageData(x,y,1,1).data[3];
+function draw(layer,layers,scale=1,renderer=new ClipRenderer(createCanvas)){const c=createCanvas(100*scale,100*scale),ctx=c.getContext('2d');ctx.scale(scale,scale);renderer.draw(ctx,layer,{layers,width:100,height:100,scale,key:l=>JSON.stringify(l),raw});return c;}
+test('shape clips to image alpha, with target opacity and transforms at preview/export scales',()=>{
+ const mask={...shape('mask',40,20,40,40),type:'image',opacity:50},l=shape('layer',0,0,100,100,{clipTo:'mask'});
+ for(const scale of[1,2,3]){const c=draw(l,[mask,l],scale);assert.ok(alpha(c,45*scale,30*scale)>=126&&alpha(c,45*scale,30*scale)<=129);assert.equal(alpha(c,65*scale,30*scale),0);assert.equal(alpha(c,20*scale,30*scale),0);}
+ mask.angle=90;const c=draw(l,[mask,l]);assert.ok(alpha(c,30,25)>0);assert.equal(alpha(c,45,25),0);
+});
+test('image-to-image clipping respects both alpha silhouettes',()=>{const mask={...shape('mask',20,20,60,60),type:'image'},l={...shape('layer',30,10,50,50,{clipTo:'mask'}),type:'image'};const c=draw(l,[mask,l]);assert.equal(alpha(c,35,30),255);assert.equal(alpha(c,55,30),0);assert.equal(alpha(c,35,15),0);});
+test('chains, hiding, missing targets and cycles are safe',()=>{const a=shape('a',0,0,40,40),b=shape('b',20,0,40,40,{clipTo:'a'}),c=shape('c',0,0,80,80,{clipTo:'b'}),layers=[a,b,c];assert.equal(alpha(draw(c,layers),25,20),255);assert.equal(alpha(draw(c,layers),45,20),0);a.visible=false;assert.equal(alpha(draw(c,layers),25,20),0);a.visible=true;a.clipTo='c';assert.equal(clipChain(c,layers),null);assert.equal(canClipTo(a,c,layers),false);assert.equal(alpha(draw(c,layers),25,20),0);assert.equal(alpha(draw({...c,clipTo:'deleted'},layers),25,20),255);});
+test('unchanged frames reuse clipping and pixel cache stays bounded',()=>{const r=new ClipRenderer(createCanvas,5000),a=shape('a',0,0,50,50),b=shape('b',0,0,50,50,{clipTo:'a'});draw(b,[a,b],1,r);const first=r.cache.get('b').canvas;draw(b,[a,b],1,r);assert.equal(r.cache.get('b').canvas,first);b.x=5;draw(b,[a,b],1,r);assert.notEqual(r.cache.get('b').canvas,first);draw({...b,w:100,h:100},[{...a,w:100,h:100},b],3,r);assert.ok(r.pixels<=r.maxPixels);});
