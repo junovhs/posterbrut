@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#171818" />
+  <title>INK/NOISE — Brutalist Poster Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo+Black&family=Barlow+Condensed:wght@400;500;600;700;800;900&family=Bebas+Neue&family=DM+Mono:wght@400;500&family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800;900&family=Oswald:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+<div id="app">
+  <header class="topbar">
+    <div class="brand"><div class="brand-mark"><span>IN</span><span>K/</span></div><div class="brand-text"><strong>INK<span class="accent">/</span>NOISE</strong><small>BRUTALIST POSTER ENGINE</small></div></div>
+    <div class="project-head"><span class="online-dot"></span><span class="eyebrow">WORKSPACE</span><input id="project-name" value="DEATH OF MESSALINA" spellcheck="false" aria-label="Project name"><span class="project-status" id="save-status">● UNSAVED</span></div>
+    <div class="top-actions"><button id="undo-btn" class="icon-action" title="Undo (Ctrl/⌘ Z)">↶</button><button id="redo-btn" class="icon-action" title="Redo (Ctrl/⌘ Shift Z)">↷</button><span class="top-separator"></span><button id="new-btn" class="quiet-button">NEW</button><button id="load-btn" class="quiet-button">OPEN <span class="minor">⌁</span></button><button id="save-btn" class="quiet-button">SAVE <span class="minor">⌘S</span></button><button id="export-btn" class="primary-button"><span>↗</span> EXPORT POSTER</button></div>
+  </header>
+  <div class="shell">
+    <nav class="toolrail" aria-label="Canvas tools">
+      <div class="rail-caption">TOOLS</div>
+      <button class="rail-tool active" data-tool="select" title="Select and move (V)"><svg viewBox="0 0 24 24"><path d="m5 3 13 9-7 1-3 7z"/></svg><span>SELECT</span></button>
+      <button class="rail-tool" data-tool="hand" title="Pan canvas (H)"><svg viewBox="0 0 24 24"><path d="M8 12V6a2 2 0 0 1 4 0v4-6a2 2 0 0 1 4 0v6-4a2 2 0 0 1 4 0v9c0 4-3 6-7 6h-2c-2 0-3-1-4-3l-4-5a2 2 0 0 1 3-3z"/></svg><span>PAN</span></button>
+      <div class="rail-rule"></div>
+      <button class="rail-tool" data-tool="add-image" title="Add image"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="1"/><circle cx="9" cy="9" r="2"/><path d="m3 17 6-5 4 4 3-3 5 5"/></svg><span>IMAGE</span></button>
+      <button class="rail-tool" data-tool="add-text" title="Add text (T)"><svg viewBox="0 0 24 24"><path d="M3 6V4h18v2M12 4v16M8 20h8"/></svg><span>TEXT</span></button>
+      <button class="rail-tool" data-tool="add-rect" title="Add rectangle (R)"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16"/></svg><span>RECT</span></button>
+      <button class="rail-tool" data-tool="add-circle" title="Add ellipse (E)"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/></svg><span>ELLIPSE</span></button>
+      <div class="rail-rule"></div>
+      <button class="rail-tool" data-tool="lasso" title="Freehand cutout / mask (L)"><svg viewBox="0 0 24 24"><path d="M6 6c-3 2-4 7-2 11s8 5 12 2 4-9 0-12-10-2-11 2" stroke-dasharray="3 2"/><path d="m14 3 6 0 0 6"/></svg><span>LASSO</span></button>
+      <button class="rail-tool" data-tool="mask-erase" title="Erase image mask (B)"><svg viewBox="0 0 24 24"><path d="m4 16 10-12 7 6-8 10H8zM9 20h12"/></svg><span>ERASE</span></button>
+      <button class="rail-tool" data-tool="mask-reveal" title="Paint image mask back (G)"><svg viewBox="0 0 24 24"><path d="M11 4 4 17l3 3 13-8-9-8ZM16 3v6m-3-3h6"/></svg><span>REVEAL</span></button>
+      <div class="rail-spacer"></div>
+      <button class="rail-tool" id="help-btn" title="Help & keyboard shortcuts"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 9a3 3 0 1 1 5 2c-1 1-2 1-2 4M12 18h.01"/></svg><span>HELP</span></button>
+    </nav>
+    <aside class="left-panel">
+      <div class="panel-label"><span>01 / COMPOSITION</span><span class="panel-dot">●</span></div>
+      <div class="composition-top"><h2>Layers<span class="layer-count" id="layer-count">00</span></h2><button class="small-square" id="add-layer-btn" title="Add layer">＋</button></div>
+      <div class="layer-subtitle">TOP LAYER PRINTS LAST</div>
+      <div id="layers-list" class="layers-list"></div>
+      <div class="layers-footer"><button id="move-up" title="Move layer up">↑</button><button id="move-down" title="Move layer down">↓</button><button id="duplicate" title="Duplicate layer">⧉</button><button id="delete" title="Delete layer">⌫</button></div>
+      <div class="left-bottom">
+        <div class="swatches-heading"><span>INK SWATCHES</span><span>03 / 03</span></div>
+        <div class="swatches"><button data-color="#ee483b" style="--swatch:#ee483b" title="Vermilion"></button><button data-color="#151616" style="--swatch:#151616" title="Carbon"></button><button data-color="#efeadb" style="--swatch:#efeadb" title="Newsprint"></button><button data-color="#e3c458" style="--swatch:#e3c458" title="Ochre"></button><button data-color="#5a79b9" style="--swatch:#5a79b9" title="Cobalt"></button><button data-color="#f2f2ef" style="--swatch:#f2f2ef" title="White"></button></div>
+        <div class="mini-stat"><span>RENDER PROCESS</span><strong>GRAIN-TRUE™ <i>●</i></strong></div>
+        <div class="mini-stat"><span>ALPHA MODE</span><strong>BINARY INK</strong></div>
+      </div>
+    </aside>
+    <main class="workspace" id="workspace">
+      <div class="workspace-toolbar"><div class="crumb"><span class="workspace-kicker">CANVAS /</span> <strong id="canvas-label">720 × 900 PX</strong><span class="portrait-tag">PORTRAIT</span></div><div class="view-actions"><button id="grid-btn" class="toolchip" title="Toggle grid">▦ GRID</button><button id="fit-btn" class="toolchip">⊞ FIT</button><span class="zoom-controls"><button id="zoom-out">−</button><span id="zoom-label">75%</span><button id="zoom-in">+</button></span></div></div>
+      <div class="stage-scroll" id="stage-scroll"><div class="stage-inner" id="stage-inner"><div class="artboard" id="artboard"><canvas id="poster" width="720" height="900"></canvas><div id="brush-cursor" class="brush-cursor" hidden></div></div></div></div>
+      <div class="workspace-footer"><div class="footer-left"><span class="live-indicator"></span><span id="footer-state">READY TO PRINT</span></div><div class="footer-right"><span>DRAG TO MOVE</span><span class="footer-divider">/</span><span>SHIFT TO CONSTRAIN</span><span class="footer-divider">/</span><span id="pointer-coordinates">X 000  Y 000</span></div></div>
+    </main>
+    <aside class="right-panel" id="inspector-panel">
+      <div class="inspector-header"><div class="inspector-tiny">02 / THE CONTROL ROOM</div><div class="inspector-heading"><h2>Inspector</h2><span class="active-chip" id="active-type">ARTBOARD</span></div></div>
+      <div id="inspector" class="inspector-scroll"></div>
+      <div class="inspector-footer"><div class="tiny-square">✳</div><div><strong>INK IS NOT TRANSPARENCY.</strong><span>Density removes dots. Every remaining dot stays solid.</span></div></div>
+    </aside>
+  </div>
+</div>
+<input type="file" id="image-input" accept="image/*" multiple hidden />
+<input type="file" id="project-input" accept="application/json,.json" hidden />
+<div id="modal-root" hidden></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<script type="module" src="./app.js"></script>
+</body>
+</html>

@@ -1,0 +1,4 @@
+.ishoo/
+**/.ishoo/*.local.toml
+**/.ishoo/cache/
+**/.ishoo/worktrees/
