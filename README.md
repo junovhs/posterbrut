@@ -57,3 +57,8 @@ thumbnails, on-demand source loading, and cached stamp rendering.
 The optional renderer checks run with `node --test tests/library-render.test.mjs`
 when `@napi-rs/canvas` is installed for development. Set `INKNOISE_CANVAS_MODULE`
 to its module path if it is installed outside this repo; the browser app needs no packages.
+
+With an image layer selected, use **REPLACE IMAGE** at the top of the inspector to
+swap its source while keeping its position, dimensions, masks, print settings,
+opacity, and blend mode. Replacement supports undo/redo and leaves the existing
+image intact if the new file cannot be decoded.

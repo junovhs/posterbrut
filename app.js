@@ -31,6 +31,7 @@ const demo = ()=>{
 let data = demo();
 let tool='select', zoom=.68, showGrid=false, brushSize=42, pointer=null, cursor={x:0,y:0}, isBusy=false;
 const images = new Map(), layerCache=new Map(), paperCache=new Map();
+let replacementTargetId=null,replacementSequence=0;
 let pendingFrame=0, history=[], future=[], lastHistory=0, toastTimer, autoStoreTimer, lassoPreview=[];
 const selected=()=>data.layers.find(l=>l.id===data.selectedId)||null;
 const getImage=src=>{
@@ -217,7 +218,7 @@ function textureInspector(l){return section('03 — TIPTOP '+(l.libraryKind==='p
 function textInspector(l){const fonts=['Anton','Archivo Black','Bebas Neue','Barlow Condensed','Oswald','Space Grotesk','Inter','IBM Plex Mono'];return section('03 — TYPOGRAPHY',`<div class="field-stack"><label>TEXT CONTENT</label><textarea class="full-textarea" data-prop="layer.text">${esc(l.text)}</textarea></div><div class="subhead">TYPE FAMILY / GOOGLE FONTS</div>${selectField('layer.font','Typeface',fonts.map(x=>[x,x]))}<div class="field-pair">${ninput('layer','weight','WEIGHT',100,900,100)}${ninput('layer','fontSize','SIZE / PX',4,800)}</div>${range('layer.tracking','Tracking',-20,50,.5,'px')}${range('layer.stretch','X stretch',30,300,1,'%')}${range('layer.lineHeight','Leading',50,250,1,'%')}${color('layer.color','Ink color')}${range('layer.distress','Text distress',0,100)}${range('layer.outline','Outline',0,12,1,'px')}<p class="section-note">True individual-glyph tracking, horizontal type stretching, variable type weight, multi-line leading and distressed letterpress printing.</p>`,'TYPE LAB');}
 function shapeInspector(l){return section('03 — SHAPE',`${selectField('layer.shape','Geometry',[['rect','Rectangle'],['ellipse','Ellipse']])}${color('layer.fill','Fill ink')}${color('layer.stroke','Outline ink')}${range('layer.strokeWidth','Stroke',0,40,1,'px')}<div class="button-row"><button class="outline-button" data-action="shape-full">FILL CANVAS</button><button class="outline-button" data-action="duplicate">DUPLICATE</button></div>`,'VECTOR');}
 function renderInspector(){const l=selected();$('#active-type').textContent=l?(l.type==='texture'?(l.libraryKind==='paper'?'PAPER':l.texture.mode==='stamp'?'STAMP':'TEXTURE'):l.type.toUpperCase()):'ARTBOARD';if(!l){inspector.innerHTML=canvasInspector();wireInspector();return;}
-  inspector.innerHTML=`<div class="ins-section" style="padding:12px 20px"><input class="full-input" aria-label="Layer name" data-prop="layer.name" value="${esc(l.name)}"></div>`+transformInspector(l)+compositionInspector(l)+(l.type==='texture'?textureInspector(l):l.type==='image'?fxInspector(l):l.type==='text'?textInspector(l):shapeInspector(l))+section('06 — LAYER ACTIONS',`<div class="button-row"><button class="outline-button" data-action="duplicate">⧉ DUPLICATE</button><button class="outline-button" data-action="delete">⌫ DELETE</button></div><div class="button-row"><button class="outline-button" data-action="up">↑ UP</button><button class="outline-button" data-action="down">↓ DOWN</button></div><button class="utility-button wide" data-action="toggle-lock">${l.locked?'UNLOCK LAYER':'LOCK LAYER'}</button>`,'EDIT');wireInspector();}
+  inspector.innerHTML=`<div class="ins-section" style="padding:12px 20px"><input class="full-input" aria-label="Layer name" data-prop="layer.name" value="${esc(l.name)}">${l.type==='image'?`<button class="utility-button wide" data-action="replace-image" ${l.locked?'disabled':''}>REPLACE IMAGE</button>`:''}</div>`+transformInspector(l)+compositionInspector(l)+(l.type==='texture'?textureInspector(l):l.type==='image'?fxInspector(l):l.type==='text'?textInspector(l):shapeInspector(l))+section('06 — LAYER ACTIONS',`<div class="button-row"><button class="outline-button" data-action="duplicate">⧉ DUPLICATE</button><button class="outline-button" data-action="delete">⌫ DELETE</button></div><div class="button-row"><button class="outline-button" data-action="up">↑ UP</button><button class="outline-button" data-action="down">↓ DOWN</button></div><button class="utility-button wide" data-action="toggle-lock">${l.locked?'UNLOCK LAYER':'LOCK LAYER'}</button>`,'EDIT');wireInspector();}
 function updateProp(path,val){const target=path.startsWith('canvas.')?data.canvas:selected();if(!target)return;const p=path.startsWith('canvas.')?path.slice(7):path.slice(6),keys=p.split('.');let holder=target;for(let i=0;i<keys.length-1;i++)holder=holder[keys[i]];const k=keys.at(-1),old=holder[k];if(typeof old==='number')val=Number(val);else if(typeof old==='boolean')val=!!val;if(Number.isNaN(val))return; if(['w','h','fontSize'].includes(k)&&typeof val==='number')val=Math.max(k==='fontSize'?4:10,val);
   if(old===val)return;remember();holder[k]=val;
   if(path==='layer.text')target.name=val.replace(/\n/g,' ').slice(0,25)||'Text';
@@ -238,7 +239,7 @@ function newShape(type){const l=mkShape(type,data.canvas.w*.32,data.canvas.h*.34
 function deleteSelected(){const l=selected();if(!l)return;mutate(()=>{const i=data.layers.indexOf(l);data.layers.splice(i,1);data.selectedId=data.layers[Math.max(0,i-1)]?.id||null;},{layerRefresh:true,inspectorRefresh:true});}
 function duplicateSelected(){const l=selected();if(!l)return;const copy=JSON.parse(JSON.stringify(l));copy.id=uid();copy.name=l.name+' copy';copy.x+=24;copy.y+=24;mutate(()=>{data.layers.splice(data.layers.indexOf(l)+1,0,copy);data.selectedId=copy.id;},{layerRefresh:true,inspectorRefresh:true});}
 function moveLayer(dir){const l=selected();if(!l)return;const i=data.layers.indexOf(l),target=i+dir;if(target<0||target>=data.layers.length)return;mutate(()=>{data.layers.splice(i,1);data.layers.splice(target,0,l);},{layerRefresh:true});}
-function runAction(a){const l=selected();switch(a){case'library':openLibrary();break;case'add-image':$('#image-input').click();break;case'add-text':newText();break;case'add-rect':newShape('rect');break;case'add-circle':newShape('ellipse');break;case'delete':deleteSelected();break;case'duplicate':duplicateSelected();break;case'up':moveLayer(1);break;case'down':moveLayer(-1);break;
+function runAction(a){const l=selected();switch(a){case'replace-image':if(l?.type==='image'&&!l.locked){replacementTargetId=l.id;replacementSequence++;$('#replace-image-input').value='';$('#replace-image-input').click();}break;case'library':openLibrary();break;case'add-image':$('#image-input').click();break;case'add-text':newText();break;case'add-rect':newShape('rect');break;case'add-circle':newShape('ellipse');break;case'delete':deleteSelected();break;case'duplicate':duplicateSelected();break;case'up':moveLayer(1);break;case'down':moveLayer(-1);break;
     case'center-h':if(l)mutate(()=>l.x=(data.canvas.w-geometry(l).w)/2,{inspectorRefresh:true});break;
     case'center-v':if(l)mutate(()=>l.y=(data.canvas.h-geometry(l).h)/2,{inspectorRefresh:true});break;
     case'shape-full':if(l)mutate(()=>{l.x=0;l.y=0;l.w=data.canvas.w;l.h=data.canvas.h;},{inspectorRefresh:true});break;
@@ -287,6 +288,17 @@ function addFiles(fileList){const files=[...fileList].filter(file=>file.type.sta
   for(const item of items.filter(Boolean)){const l=mkImage(item.src,item.name.replace(/\.[^.]+$/,''),75+data.layers.length%4*20,110+data.layers.length%3*16,Math.round(data.canvas.w*.68),Math.round(data.canvas.w*.68));data.layers.push(l);data.selectedId=l.id;getImage(item.src);}
   markDirty();renderLayers();renderInspector();schedule();notify(`${files.length} IMAGE${files.length!==1?'S':''} ADDED · USE LASSO FOR CUTOUT`);
 });}
+async function replaceImage(file,targetId,sequence){
+  const project=data,target=data.layers.find(l=>l.id===targetId);
+  if(!file||!target||target.type!=='image'||target.locked)return;
+  if(!file.type.startsWith('image/')){notify('PLEASE CHOOSE AN IMAGE');return;}
+  try{
+    const src=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(new Error('File could not be read'));reader.readAsDataURL(file);});
+    if(!await getImage(src).promise)throw new Error('Image could not be decoded');
+    if(sequence!==replacementSequence||project!==data||!data.layers.includes(target)||target.locked||target.src===src)return;
+    remember(true);mutate(()=>{target.src=src;layerCache.clear();},{historyEntry:false,layerRefresh:true,inspectorRefresh:true});notify('IMAGE REPLACED');
+  }catch(e){notify('IMAGE NOT REPLACED: '+e.message);}
+}
 function download(blob,filename){const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(url);a.remove();},3000);}
 function saveJSON(){const blob=new Blob([JSON.stringify({...data,version:2,engine:'INK/NOISE'},null,2)],{type:'application/json'});download(blob,(data.project||'untitled').toLowerCase().replace(/[^a-z0-9]+/g,'-')+'.inknoise.json');$('#save-status').textContent='● SAVED';notify('EDITABLE PROJECT SAVED');}
 function loadJSON(file){const r=new FileReader();r.onload=()=>{try{const obj=JSON.parse(r.result);if(!obj.canvas||!Array.isArray(obj.layers))throw new Error('Invalid project file');remember();restore(obj);fitZoom();markDirty();notify('PROJECT OPENED');}catch(e){notify('INVALID PROJECT FILE');}};r.readAsText(file);}
@@ -320,6 +332,8 @@ function refreshAll(){renderLayers();renderInspector();updateHistoryUI();setZoom
 function bind(){
   $$('[data-tool]').forEach(el=>el.addEventListener('click',()=>setTool(el.dataset.tool)));
   $('#library-btn').onclick=()=>openLibrary();$('#help-btn').onclick=openHelp;$('#add-layer-btn').onclick=()=>$('#image-input').click();$('#image-input').onchange=e=>{addFiles(e.target.files);e.target.value='';};
+  $('#replace-image-input').onchange=e=>{const id=replacementTargetId,sequence=replacementSequence;replacementTargetId=null;replaceImage(e.target.files[0],id,sequence);e.target.value='';};
+  $('#replace-image-input').oncancel=()=>{replacementTargetId=null;};
   $('#project-input').onchange=e=>{if(e.target.files[0])loadJSON(e.target.files[0]);e.target.value='';};
   $('#new-btn').onclick=()=>{if(!confirm('Create a new composition? Export or save your current work first.'))return;remember();data={project:'UNTITLED COMPOSITION',canvas:{w:720,h:900,bg:'#e94736',paper:20,seed:420,texture:1},layers:[],selectedId:null};$('#project-name').value=data.project;invalidate();refreshAll();};
   $('#load-btn').onclick=()=>$('#project-input').click();$('#save-btn').onclick=saveJSON;$('#export-btn').onclick=openExport;
