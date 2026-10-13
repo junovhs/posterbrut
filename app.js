@@ -1,5 +1,6 @@
 import { tiptopAssets } from './library/catalog.js';
 import { renderTexture } from './library/render.js';
+import { layoutText, drawTextLayout } from './library/text-render.js';
 
 /* INK/NOISE — dependency-free binary-ink poster compositor.
  * Everything is rendered locally in Canvas 2D; no uploaded images leave your device.
@@ -145,19 +146,10 @@ function textureCanvas(l,scale){
   const c=renderTexture(image.img,w,h,l.texture);layerCache.set(key,c);
   if(layerCache.size>22)layerCache.delete(layerCache.keys().next().value);return c;
 }
-function drawText(ctx,l,scale){ctx.save();ctx.font=fontSpec(l);ctx.textBaseline='top';ctx.textAlign='left';const stretch=(l.stretch||100)/100,leading=(l.lineHeight||100)/100*l.fontSize;
-  const lines=l.text.split('\n');
-  ctx.scale(stretch,1);
-  const c=colorRGB(l.color||'#000');ctx.fillStyle=l.color||'#000';ctx.strokeStyle=l.color||'#000';ctx.lineWidth=(l.outline||0)/stretch;
-  lines.forEach((line,row)=>{let width=0;for(const chr of line)width+=ctx.measureText(chr).width+(l.tracking||0);let x=l.align==='center'?-width/2:l.align==='right'?-width:0;
-    if(l.align==='center')x+=effectiveTextWidth(l)/(2*stretch);if(l.align==='right')x+=effectiveTextWidth(l)/stretch;
-    for(const chr of line){if(l.outline>0)ctx.strokeText(chr,x,row*leading);else ctx.fillText(chr,x,row*leading);x+=ctx.measureText(chr).width+(l.tracking||0);}
-  });ctx.restore();
-}
-function textCanvas(l,scale){const g=geometry(l),w=Math.max(1,Math.ceil(g.w*scale)+8),h=Math.max(1,Math.ceil(g.h*scale)+10);
+function textCanvas(l,scale){const g=geometry(l),measure=document.createElement('canvas').getContext('2d');measure.font=fontSpec(l);const layout=layoutText(measure,l,g.w,g.h),w=Math.max(1,Math.ceil(layout.w*scale)),h=Math.max(1,Math.ceil(layout.h*scale));
   const key='text:'+l.id+':'+w+':'+h+':'+JSON.stringify([l.text,l.font,l.fontSize,l.weight,l.color,l.tracking,l.stretch,l.lineHeight,l.distress,l.align,l.outline])+':'+data.canvas.seed;
   if(layerCache.has(key))return layerCache.get(key);
-  const c=newCanvas(w,h),cx=c.getContext('2d');cx.scale(scale,scale);drawText(cx,l,scale);
+  const c=newCanvas(w,h),cx=c.getContext('2d');cx.scale(scale,scale);cx.translate(-layout.x,-layout.y);cx.font=fontSpec(l);drawTextLayout(cx,l,layout);c.textOffset={x:layout.x,y:layout.y};
   if(l.distress){const img=cx.getImageData(0,0,w,h),d=img.data,v=l.distress/100,seed=data.canvas.seed+l.id.length;
     for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=(y*w+x)*4;if(d[i+3]<8)continue;const rng=hash(x,y,seed),patch=noise2(x/3.3,y/3.3,seed+90);if(rng*.69+patch*.31<v*.47)d[i+3]=0;else if(d[i+3]>120)d[i+3]=255;}
     cx.putImageData(img,0,0);
@@ -171,7 +163,7 @@ function drawComposition(ctx,scale,{preview=false,includeGuides=false}={}){
     if(l.type==='image'){const c=processedImage(l,scale);if(c){ctx.drawImage(c,0,0,l.w,l.h);}else{ctx.fillStyle='#201f1c';ctx.fillRect(0,0,l.w,l.h);ctx.fillStyle='#e6d9bf';ctx.font='16px monospace';ctx.fillText('LOADING IMAGE...',15,30);}}
     else if(l.type==='texture'){const c=textureCanvas(l,scale);if(c)ctx.drawImage(c,0,0,l.w,l.h);}
     else if(l.type==='shape')drawShape(ctx,l);
-    else if(l.type==='text'){const c=textCanvas(l,scale);const g=geometry(l);ctx.drawImage(c,0,0,g.w+8/scale,g.h+10/scale);}
+    else if(l.type==='text'){const c=textCanvas(l,scale);ctx.drawImage(c,c.textOffset.x,c.textOffset.y,c.width/scale,c.height/scale);}
     ctx.restore();
   }
   if(data.canvas.paper>0){ctx.save();ctx.globalCompositeOperation='source-over';ctx.globalAlpha=Math.min(.95,data.canvas.paper/100+.22);ctx.drawImage(buildPaper(scale),0,0,w,h);ctx.restore();}
