@@ -4,14 +4,14 @@
 
 ## Run
 
-No dependencies, backend, account, or build step.
+No backend or account. The TypeScript effect engine has a small build step.
 
 ```bash
-cd inknoise-studio
-python3 -m http.server 8000
+pnpm install
+pnpm dev
 ```
 
-Open http://localhost:8000. You can also deploy the directory as a static site to Vercel, Netlify, Cloudflare Pages, or GitHub Pages. Internet access is needed only for Google Fonts; the renderer, compositing, and exports are local.
+Open http://127.0.0.1:8046/. Deploy the generated `dist/` directory as a static site. Internet access is needed only for Google Fonts; the renderer, compositing, and exports are local.
 
 ## Print engine
 
@@ -41,7 +41,7 @@ No server-side image processing or external image uploads. Image data remains in
 
 ## Notes
 
-A built-in browser's `file://` restrictions can interfere with loading modules and local image assets; run a local static server as above. Imported large raster images saved in local autosave can exceed browser storage quotas; use **SAVE** to download the complete project JSON. Native export uses the browser's PNG encoder, with RGB output over the selected paper color.
+A built-in browser's `file://` restrictions can interfere with loading modules and local image assets; use the dev server above. Imported large raster images saved in local autosave can exceed browser storage quotas; use **SAVE** to download the complete project JSON. Native export uses the browser's PNG encoder, with RGB output over the selected paper color.
 
 ## Tiptop library
 
@@ -62,3 +62,40 @@ With an image layer selected, use **REPLACE IMAGE** at the top of the inspector 
 swap its source while keeping its position, dimensions, masks, print settings,
 opacity, and blend mode. Replacement supports undo/redo and leaves the existing
 image intact if the new file cannot be decoded.
+
+## Precision threshold inspector
+
+Select an image to get the effect controls directly below **Replace image**. Each
+main slider has a numeric field: threshold uses 0.1 increments. **Auto threshold**
+uses Otsu separation on the current tone-adjusted histogram. Clean, Photocopy,
+Detail, and Linework are starting points; Hold Original compares the untreated
+source while held (mouse, touch, Space, or Enter).
+
+Open **Levels & Detail** for black/white levels, denoising, and detail boost.
+**Local Threshold** adds strength, neighborhood size, bias, and local mean or
+Sauvola processing for uneven lighting. Ink colors, grain, density, existing print
+modes, masks, blending, and editable project files remain available.
+
+The new engine lives in strict TypeScript under `src/threshold/`. The existing
+editor shell is JavaScript. A module worker owns source analysis and pixel loops;
+the UI transports settings and paints finished bitmaps. Paper grain, text distress,
+and tinted stamp pixel passes also run in that worker. Sources have a bounded
+worker cache, previews are capped at 1024 pixels on the long edge, queued previews
+coalesce per layer, stale results are ignored, and export jobs have independent
+slots and render at the requested output size. Controls remain usable while the
+worker computes; there is no UI-thread pixel-processing fallback.
+
+### Development and deployment
+
+```bash
+pnpm install
+pnpm typecheck
+pnpm test
+pnpm dev
+```
+
+The dev server serves the compiled `dist/` at `http://127.0.0.1:8046/`.
+Use `PORT` to change the port. `pnpm build` generates the static output; Vercel
+uses that build command and the `dist` output directory from `vercel.json`.
+No runtime packages are added. `@napi-rs/canvas` is only a development test adapter.
+Ishoo's durable issue store remains synced separately from source on `refs/ishoo/store`.

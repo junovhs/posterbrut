@@ -1,3 +1,4 @@
+import { ThresholdClient, defaults as printDefaults } from './engine/client.js';
 import { tiptopAssets } from './library/catalog.js';
 import { renderTexture } from './library/render.js';
 import { layoutText, drawTextLayout } from './library/text-render.js';
@@ -14,7 +15,7 @@ const clamp = (n,lo,hi)=>Math.max(lo,Math.min(hi,n));
 const uid = ()=> 'l' + Math.random().toString(36).slice(2,9);
 const esc = t => String(t).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
 const f = (n,d=0)=>Number(n).toFixed(d);
-const defaultFX = ()=>({mode:'threshold',ink:'#161514',secondInk:'#e0be60',threshold:130,contrast:165,brightness:0,gamma:100,adaptive:0,grain:53,grainSize:42,grit:23,dither:46,halftone:9,angle:34,roughness:32,inkDensity:100,invert:false});
+const defaultFX = ()=>({...printDefaults,mode:'threshold',ink:'#161514',secondInk:'#e0be60',threshold:130,contrast:165,brightness:0,gamma:100,adaptive:0,grain:53,grainSize:42,grit:23,dither:46,halftone:9,angle:34,roughness:32,inkDensity:100,invert:false});
 const defaultMask = ()=>({type:'none',points:[],roughness:30,strokes:[]});
 const mkImage = (src,name,x=80,y=110,w=560,h=560)=>({id:uid(),type:'image',name,visible:true,locked:false,x,y,w,h,angle:0,opacity:100,blend:'source-over',src,fx:defaultFX(),mask:defaultMask()});
 const mkText = (text,x,y,size=82)=>({id:uid(),type:'text',name:text.replace(/\n/g,' ').slice(0,25)||'Type',visible:true,locked:false,x,y,w:400,h:size,angle:0,opacity:100,blend:'source-over',text,font:'Anton',fontSize:size,weight:400,color:'#191817',tracking:0,stretch:100,lineHeight:100,distress:0,align:'left',outline:0});
@@ -31,6 +32,8 @@ const demo = ()=>{
 };
 let data = demo();
 let tool='select', zoom=.68, showGrid=false, brushSize=42, pointer=null, cursor={x:0,y:0}, isBusy=false;
+const printEngine=new ThresholdClient(),processing=new Map(),latestJobs=new Map(),lastFrames=new Map(),imageAnalysis=new Map(),analysisCache=new Map();
+let compareImageId=null,fxGesture=null;
 const images = new Map(), layerCache=new Map(), paperCache=new Map();
 let replacementTargetId=null,replacementSequence=0;
 let pendingFrame=0, history=[], future=[], lastHistory=0, toastTimer, autoStoreTimer, lassoPreview=[];
@@ -39,9 +42,9 @@ const getImage=src=>{
   if(!src)return null;
   if(images.has(src))return images.get(src);
   const img = new Image(); img.crossOrigin = src.startsWith('http')?'anonymous':null;
-  const entry={img,ready:false,error:false};images.set(src,entry);
+  const entry={img,ready:false,error:false,version:uid()};images.set(src,entry);
   entry.promise=new Promise(resolve=>entry.finish=resolve);
-  img.onload=()=>{entry.ready=true;entry.finish(true);invalidate();schedule();};
+  img.onload=()=>{entry.ready=true;entry.finish(true);const live=new Set(data.layers.map(l=>l.src));for(const [key,value] of images){if(images.size<=12)break;if(value.ready&&!live.has(key))images.delete(key);}invalidate();schedule();};
   img.onerror=()=>{entry.error=true;entry.finish(false);notify('IMAGE COULD NOT BE LOADED');};
   img.src=src;
   return entry;
@@ -52,10 +55,10 @@ function mutate(fn,{historyEntry=true,inspectorRefresh=false,layerRefresh=false}
 function markDirty(){$('#save-status').textContent='● MODIFIED'; clearTimeout(autoStoreTimer);autoStoreTimer=setTimeout(()=>{try{localStorage.setItem('inknoise-autosave',snapshot());$('#save-status').textContent='● AUTOSAVED';}catch(e){$('#save-status').textContent='● LOCAL ONLY';}},1100);}
 function undo(){if(!history.length)return;future.push(snapshot());restore(JSON.parse(history.pop()));updateHistoryUI();}
 function redo(){if(!future.length)return;history.push(snapshot());restore(JSON.parse(future.pop()));updateHistoryUI();}
-function restore(obj){data=obj;invalidate();$('#project-name').value=data.project;refreshAll();}
+function restore(obj){data=obj;for(const l of data.layers)if(l.type==='image')l.fx={...defaultFX(),...l.fx};invalidate();$('#project-name').value=data.project;refreshAll();}
 function updateHistoryUI(){$('#undo-btn').disabled=history.length===0;$('#redo-btn').disabled=future.length===0;}
 function notify(message){const el=$('#toast');el.textContent=message;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),2400);}
-function invalidate(){layerCache.clear();paperCache.clear();}
+function invalidate(){layerCache.clear();paperCache.clear();const ids=new Set(data.layers.map(l=>l.id));for(const key of lastFrames.keys())if(key!=='paper'&&!ids.has(key)&&!ids.has(key.replace(/^(text|stamp):/,'')))lastFrames.delete(key);}
 function schedule(){if(!pendingFrame)pendingFrame=requestAnimationFrame(()=>{pendingFrame=0;render();});}
 function fontSpec(l){return `${l.weight||400} ${l.fontSize||48}px "${l.font||'Anton'}", Impact, "Arial Black", sans-serif`; }
 function effectiveTextWidth(l){const dummy=document.createElement('canvas').getContext('2d');dummy.font=fontSpec(l);const lines=l.text.split('\n');return Math.max(1,...lines.map(line=>{let v=0;for(const c of line)v+=dummy.measureText(c).width+(l.tracking||0);return v*(l.stretch||100)/100;}));}
@@ -69,18 +72,20 @@ const hash=(x,y,seed=0)=>{let n=Math.imul(x|0,374761393)+Math.imul(y|0,668265263
 function noise2(x,y,seed){const xi=Math.floor(x),yi=Math.floor(y),xf=x-xi,yf=y-yi;const ux=xf*xf*(3-2*xf),uy=yf*yf*(3-2*yf);const a=hash(xi,yi,seed),b=hash(xi+1,yi,seed),c=hash(xi,yi+1,seed),d=hash(xi+1,yi+1,seed);return ((a+(b-a)*ux)*(1-uy)+(c+(d-c)*ux)*uy);}
 function newCanvas(w,h){const c=document.createElement('canvas');c.width=Math.max(1,Math.round(w));c.height=Math.max(1,Math.round(h));return c;}
 function colorRGB(c){const el=document.createElement('canvas').getContext('2d');el.fillStyle=c;const normalized=el.fillStyle;let m=normalized.match(/^#([a-f0-9]{6})$/i);if(m)return [parseInt(m[1].slice(0,2),16),parseInt(m[1].slice(2,4),16),parseInt(m[1].slice(4,6),16)];m=normalized.match(/^#([a-f0-9]{3})$/i);if(m)return [...m[1]].map(x=>parseInt(x+x,16));return [0,0,0];}
-function buildPaper(scale){const w=Math.round(data.canvas.w*scale),h=Math.round(data.canvas.h*scale),amount=data.canvas.paper;
-  const key=`${w}:${h}:${amount}:${data.canvas.seed}:${data.canvas.bg}`;if(paperCache.has(key))return paperCache.get(key);
-  const c=newCanvas(w,h),cx=c.getContext('2d'); const img=cx.createImageData(w,h),a=img.data;
-  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=(y*w+x)*4,coarse=noise2(x/45,y/45,data.canvas.seed+6),fine=hash(x,y,data.canvas.seed+7),r=hash(x,y,data.canvas.seed+139);let alpha=0;
-    if(fine<amount*.0029)alpha=60+Math.floor(r*100);
-    else if(fine>1-amount*.0041)alpha=23+Math.floor(r*60);
-    else alpha=Math.floor(amount*(.13+.55*Math.abs(coarse-.5))*(.15+r));
-    const dark=fine<.65;a[i]=dark?13:255;a[i+1]=dark?17:246;a[i+2]=dark?15:226;a[i+3]=Math.min(235,alpha);
-  }
-  cx.putImageData(img,0,0);paperCache.set(key,c);if(paperCache.size>5)paperCache.delete(paperCache.keys().next().value);return c;
+function requestRaster(slot,key,sourceKey,w,h,task,source,cache,finish){
+  latestJobs.set(slot,key);if(cache.has(key)){if(analysisCache.has(key)){imageAnalysis.set(slot,analysisCache.get(key));updateAnalysisUI();}return Promise.resolve(cache.get(key));}if(processing.has(key))return processing.get(key);
+  const promise=printEngine.run(slot,sourceKey,w,h,task,source).then(result=>{
+    const c=newCanvas(w,h);c.getContext('2d').drawImage(result.bitmap,0,0);result.bitmap.close();if(finish)finish(c);
+    cache.set(key,c);if(cache.size>22)cache.delete(cache.keys().next().value);
+    if(latestJobs.get(slot)===key&&!slot.startsWith('export')&&(slot==='paper'||data.layers.some(l=>l.id===slot.replace(/^(text|stamp):/,'')))){lastFrames.set(slot,c);if(result.analysis){analysisCache.set(key,result.analysis);if(analysisCache.size>48)analysisCache.delete(analysisCache.keys().next().value);imageAnalysis.set(slot,result.analysis);updateAnalysisUI();}schedule();}
+    return c;
+  }).catch(error=>{if(error.name!=='AbortError'){notify('PROCESSING FAILED: '+error.message);console.error(error);}throw error;}).finally(()=>processing.delete(key));
+  processing.set(key,promise);return promise;
 }
-const bayer8=[0,48,12,60,3,51,15,63,32,16,44,28,35,19,47,31,8,56,4,52,11,59,7,55,40,24,36,20,43,27,39,23,2,50,14,62,1,49,13,61,34,18,46,30,33,17,45,29,10,58,6,54,9,57,5,53,42,26,38,22,41,25,37,21];
+function buildPaper(scale,wait=false){const w=Math.round(data.canvas.w*scale),h=Math.round(data.canvas.h*scale),key=`paper:${w}:${h}:${data.canvas.paper}:${data.canvas.seed}`;
+  const job=requestRaster(wait?'export-paper':'paper',key,'',w,h,{kind:'paper',amount:data.canvas.paper,seed:data.canvas.seed},undefined,paperCache);
+  if(wait)return job;job.catch(()=>{});return paperCache.get(key)||lastFrames.get('paper');
+}
 function applyMask(l,processed,w,h){const m=l.mask||defaultMask();if(m.type==='none'&&(!m.strokes||!m.strokes.length))return;
   const mask=newCanvas(w,h),mc=mask.getContext('2d');mc.fillStyle='#fff';
   if(m.type==='none')mc.fillRect(0,0,w,h);
@@ -91,82 +96,43 @@ function applyMask(l,processed,w,h){const m=l.mask||defaultMask();if(m.type==='n
   for(const stroke of m.strokes||[]){const pts=stroke.points||[];if(!pts.length)continue;mc.save();mc.globalCompositeOperation=stroke.mode==='erase'?'destination-out':'source-over';mc.strokeStyle='#fff';mc.fillStyle='#fff';mc.lineCap='round';mc.lineJoin='round';mc.lineWidth=Math.max(1,(stroke.size||30)*w/Math.max(1,l.w));mc.beginPath();pts.forEach((p,i)=>i?mc.lineTo(p[0]*w,p[1]*h):mc.moveTo(p[0]*w,p[1]*h));if(pts.length===1){mc.arc(pts[0][0]*w,pts[0][1]*h,mc.lineWidth/2,0,Math.PI*2);mc.fill();}else mc.stroke();mc.restore();}
   const pc=processed.getContext('2d');pc.save();pc.globalCompositeOperation='destination-in';pc.drawImage(mask,0,0);pc.restore();
 }
-function processedImage(l,scale){const image=getImage(l.src);if(!image?.ready)return null;
-  const w=Math.min(3500,Math.max(1,Math.round(l.w*scale))),h=Math.min(3500,Math.max(1,Math.round(l.h*scale)));
-  const key=l.id+':'+w+':'+h+':'+JSON.stringify(l.fx)+':'+JSON.stringify(l.mask)+':'+data.canvas.seed+':'+l.src.slice(0,70);
-  if(layerCache.has(key))return layerCache.get(key);
-  const src=newCanvas(w,h),sx=src.getContext('2d',{willReadFrequently:true});sx.drawImage(image.img,0,0,w,h);
-  const pixels=sx.getImageData(0,0,w,h),out=sx.createImageData(w,h),d=pixels.data,o=out.data,fx=l.fx||defaultFX();
-  const cutoff=fx.threshold, contrast=fx.contrast/100,gamma=fx.gamma/100,brightness=fx.brightness*1.5;
-  const grain=fx.grain/100,grit=fx.grit/100,scaleFine=(101-fx.grainSize)/100,adaptive=fx.adaptive/100;
-  const ink=colorRGB(fx.ink),ink2=colorRGB(fx.secondInk||'#d3a94d');
-  const seed=data.canvas.seed+l.id.length*17;
-  let integral=null;
-  if(adaptive>0){integral=new Float64Array((w+1)*(h+1));for(let y=0;y<h;y++){let run=0;for(let x=0;x<w;x++){const i=(y*w+x)*4;run+=(d[i]*.2126+d[i+1]*.7152+d[i+2]*.0722);integral[(y+1)*(w+1)+x+1]=integral[y*(w+1)+x+1]+run;}}}
-  const angle=(fx.angle||0)*Math.PI/180,sa=Math.sin(angle),ca=Math.cos(angle),size=Math.max(2,24-(fx.halftone||9)*1.7);
-  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
-    const i=(y*w+x)*4;if(d[i+3]<5)continue;
-    let lum=d[i]*.2126+d[i+1]*.7152+d[i+2]*.0722;
-    lum=clamp(128+(lum-128)*contrast+brightness,0,255);
-    if(gamma!==1)lum=255*Math.pow(lum/255,gamma);
-    if(fx.invert)lum=255-lum;
-    let thr=cutoff;
-    if(adaptive&&integral){const r=9+Math.floor(fx.adaptive/7),x0=Math.max(0,x-r),x1=Math.min(w-1,x+r),y0=Math.max(0,y-r),y1=Math.min(h-1,y+r),mean=(integral[(y1+1)*(w+1)+x1+1]-integral[y0*(w+1)+x1+1]-integral[(y1+1)*(w+1)+x0]+integral[y0*(w+1)+x0])/((x1-x0+1)*(y1-y0+1));thr+=(mean-128)*adaptive*.78;}
-    const fine=hash(x,y,seed),fiber=noise2(x/(1+scaleFine*2),y/(1+scaleFine*2),seed+8),blotch=noise2(x/(6+fx.grainSize*.19),y/(6+fx.grainSize*.19),seed+11),cloud=noise2(x/48,y/48,seed+38);
-    const grainOffset=((fine-.5)*1.25+(fiber-.5)*.5+(blotch-.5)*.85+(cloud-.5)*.35)*grain*100;
-    const printJitter=(blotch-.5)*grit*59+(hash(Math.floor(x/2),Math.floor(y/2),seed+55)-.5)*grit*22;
-    let printed=false,secondary=false;
-    if(fx.mode==='halftone'){
-      const u=(x*ca+y*sa)/size,v=(-x*sa+y*ca)/size;
-      const dx=(u-Math.floor(u)-.5)*2,dy=(v-Math.floor(v)-.5)*2;
-      const r2=dx*dx+dy*dy,coverage=clamp((thr-lum+128+grainOffset*.75)/255,0,1);
-      printed=r2<coverage*1.72;secondary=false;
-    }else if(fx.mode==='dither'){
-      const b=(bayer8[(y%8)*8+(x%8)]/63-.5)*fx.dither*1.85;
-      printed=lum+grainOffset*.68+printJitter*.5<thr+b;
-    }else if(fx.mode==='duotone'){
-      printed=lum+grainOffset+printJitter<thr;secondary=!printed&&lum+grainOffset<thr+42;
-    }else printed=lum+grainOffset+printJitter<thr;
-    if(!printed&&!secondary){const dust=hash(x,y,seed+141),island=noise2(x/3.2,y/3.2,seed+121);if(dust<grit*.018&&island>.53)printed=true;else continue;}
-    const edge=clamp(1-Math.abs(lum-thr)/72,0,1);
-    const dropout=1-fx.inkDensity/100;
-    const attrition=grit*(.009 + edge*.087);
-    const densityTest=hash(x,y,seed+207)*.72+noise2(x/(2+fx.grainSize*.06),y/(2+fx.grainSize*.06),seed+211)*.28;
-    if(densityTest<dropout*.88+attrition)continue;
-    const rgb=secondary?ink2:ink;o[i]=rgb[0];o[i+1]=rgb[1];o[i+2]=rgb[2];o[i+3]=255;
-  }
-  const target=newCanvas(w,h),tc=target.getContext('2d');tc.putImageData(out,0,0);applyMask(l,target,w,h);
-  layerCache.set(key,target);if(layerCache.size>22)layerCache.delete(layerCache.keys().next().value);return target;
+function processedImage(l,scale,preview=false,wait=false){const image=getImage(l.src);if(!image?.ready)return wait?image?.promise.then(()=>processedImage(l,scale,preview,true)):null;
+  const renderScale=preview?Math.min(1,zoom*(window.devicePixelRatio||1),1024/Math.max(l.w,l.h)):scale;
+  const w=Math.max(1,Math.round(l.w*renderScale)),h=Math.max(1,Math.round(l.h*renderScale));
+  const sourceKey=`${l.id}:${image.version}:${w}:${h}`,key=sourceKey+':'+JSON.stringify(l.fx)+':'+JSON.stringify(l.mask)+':'+data.canvas.seed;
+  const fx={...l.fx,localRadius:Math.max(1,Math.round((l.fx.localRadius||16)*renderScale))},maskLayer=JSON.parse(JSON.stringify({...l,src:''}));
+  const job=requestRaster(wait&&!preview?'export:'+l.id:l.id,key,sourceKey,w,h,{kind:'image',fx,seed:data.canvas.seed+l.id.length*17},()=>createImageBitmap(image.img,{resizeWidth:w,resizeHeight:h,resizeQuality:'high'}),layerCache,c=>applyMask(maskLayer,c,w,h));
+  if(wait)return job;job.catch(()=>{});return layerCache.get(key)||lastFrames.get(l.id);
 }
-function textureCanvas(l,scale){
+function textureCanvas(l,scale,wait=false){
   const image=getImage(l.src);if(!image?.ready)return null;
-  const w=Math.min(3500,Math.max(1,Math.round(l.w*scale))),h=Math.min(3500,Math.max(1,Math.round(l.h*scale)));
-  const key='texture:'+l.id+':'+w+':'+h+':'+l.src+':'+JSON.stringify(l.texture);
-  if(layerCache.has(key))return layerCache.get(key);
-  const c=renderTexture(image.img,w,h,l.texture);layerCache.set(key,c);
-  if(layerCache.size>22)layerCache.delete(layerCache.keys().next().value);return c;
+  const w=Math.max(1,Math.round(l.w*scale)),h=Math.max(1,Math.round(l.h*scale)),key='texture:'+l.id+':'+w+':'+h+':'+image.version+':'+JSON.stringify(l.texture);
+  if(layerCache.has(key))return wait?Promise.resolve(layerCache.get(key)):layerCache.get(key);
+  if(l.texture.mode==='stamp'){
+    const job=requestRaster(wait?'export-stamp:'+l.id:'stamp:'+l.id,key,key,w,h,{kind:'stamp',color:l.texture.color,polarity:l.texture.polarity},()=>createImageBitmap(image.img,{resizeWidth:w,resizeHeight:h}),layerCache);
+    if(wait)return job;job.catch(()=>{});return lastFrames.get('stamp:'+l.id);
+  }
+  const c=renderTexture(image.img,w,h,l.texture);layerCache.set(key,c);return wait?Promise.resolve(c):c;
 }
-function textCanvas(l,scale){const g=geometry(l),measure=document.createElement('canvas').getContext('2d');measure.font=fontSpec(l);const layout=layoutText(measure,l,g.w,g.h),w=Math.max(1,Math.ceil(layout.w*scale)),h=Math.max(1,Math.ceil(layout.h*scale));
+function textCanvas(l,scale,wait=false){const g=geometry(l),measure=document.createElement('canvas').getContext('2d');measure.font=fontSpec(l);const layout=layoutText(measure,l,g.w,g.h),w=Math.max(1,Math.ceil(layout.w*scale)),h=Math.max(1,Math.ceil(layout.h*scale));
   const key='text:'+l.id+':'+w+':'+h+':'+JSON.stringify([l.text,l.font,l.fontSize,l.weight,l.color,l.tracking,l.stretch,l.lineHeight,l.distress,l.align,l.outline])+':'+data.canvas.seed;
   if(layerCache.has(key))return layerCache.get(key);
   const c=newCanvas(w,h),cx=c.getContext('2d');cx.scale(scale,scale);cx.translate(-layout.x,-layout.y);cx.font=fontSpec(l);drawTextLayout(cx,l,layout);c.textOffset={x:layout.x,y:layout.y};
-  if(l.distress){const img=cx.getImageData(0,0,w,h),d=img.data,v=l.distress/100,seed=data.canvas.seed+l.id.length;
-    for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=(y*w+x)*4;if(d[i+3]<8)continue;const rng=hash(x,y,seed),patch=noise2(x/3.3,y/3.3,seed+90);if(rng*.69+patch*.31<v*.47)d[i+3]=0;else if(d[i+3]>120)d[i+3]=255;}
-    cx.putImageData(img,0,0);
-  }layerCache.set(key,c);if(layerCache.size>22)layerCache.delete(layerCache.keys().next().value);return c;
+  if(l.distress){const job=requestRaster(wait?'export-text:'+l.id:'text:'+l.id,key,key,w,h,{kind:'distress',amount:l.distress,seed:data.canvas.seed+l.id.length},()=>createImageBitmap(c),layerCache,output=>output.textOffset=c.textOffset);job.catch(()=>{});return lastFrames.get('text:'+l.id)||c;}
+  layerCache.set(key,c);if(layerCache.size>22)layerCache.delete(layerCache.keys().next().value);return c;
 }
 function drawShape(ctx,l){ctx.beginPath();if(l.shape==='ellipse')ctx.ellipse(l.w/2,l.h/2,Math.max(0,l.w/2),Math.max(0,l.h/2),0,0,Math.PI*2);else ctx.rect(0,0,l.w,l.h);if(l.fill!=='transparent'){ctx.fillStyle=l.fill;ctx.fill();}if(l.strokeWidth>0){ctx.strokeStyle=l.stroke;ctx.lineWidth=l.strokeWidth;ctx.stroke();}}
 function drawComposition(ctx,scale,{preview=false,includeGuides=false}={}){
   const w=data.canvas.w,h=data.canvas.h;ctx.save();ctx.setTransform(scale,0,0,scale,0,0);ctx.clearRect(0,0,w,h);ctx.fillStyle=data.canvas.bg;ctx.fillRect(0,0,w,h);
   for(const l of data.layers){if(!l.visible)continue;
     ctx.save();ctx.globalAlpha=clamp(l.opacity/100,0,1);ctx.globalCompositeOperation=l.blend||'source-over';ctx.translate(l.x,l.y);ctx.rotate((l.angle||0)*Math.PI/180);
-    if(l.type==='image'){const c=processedImage(l,scale);if(c){ctx.drawImage(c,0,0,l.w,l.h);}else{ctx.fillStyle='#201f1c';ctx.fillRect(0,0,l.w,l.h);ctx.fillStyle='#e6d9bf';ctx.font='16px monospace';ctx.fillText('LOADING IMAGE...',15,30);}}
+    if(l.type==='image'){const c=processedImage(l,scale,preview);if(preview&&compareImageId===l.id&&getImage(l.src)?.ready){ctx.drawImage(getImage(l.src).img,0,0,l.w,l.h);}else if(c){ctx.drawImage(c,0,0,l.w,l.h);}else{ctx.fillStyle='#201f1c';ctx.fillRect(0,0,l.w,l.h);ctx.fillStyle='#e6d9bf';ctx.font='16px monospace';ctx.fillText('LOADING IMAGE...',15,30);}}
     else if(l.type==='texture'){const c=textureCanvas(l,scale);if(c)ctx.drawImage(c,0,0,l.w,l.h);}
     else if(l.type==='shape')drawShape(ctx,l);
     else if(l.type==='text'){const c=textCanvas(l,scale);ctx.drawImage(c,c.textOffset.x,c.textOffset.y,c.width/scale,c.height/scale);}
     ctx.restore();
   }
-  if(data.canvas.paper>0){ctx.save();ctx.globalCompositeOperation='source-over';ctx.globalAlpha=Math.min(.95,data.canvas.paper/100+.22);ctx.drawImage(buildPaper(scale),0,0,w,h);ctx.restore();}
+  if(data.canvas.paper>0){ctx.save();ctx.globalCompositeOperation='source-over';ctx.globalAlpha=Math.min(.95,data.canvas.paper/100+.22);const stock=buildPaper(scale);if(stock)ctx.drawImage(stock,0,0,w,h);ctx.restore();}
   if(preview){drawSelection(ctx);if(tool==='lasso'&&lassoPreview.length){ctx.save();ctx.strokeStyle='#fff';ctx.lineWidth=1.7/zoom;ctx.setLineDash([4/zoom,4/zoom]);ctx.beginPath();lassoPreview.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.stroke();ctx.restore();}}
   ctx.restore();
 }
@@ -194,9 +160,23 @@ function canvasInspector(){return section('01 — ARTBOARD',`<div class="field-p
   +section('03 — QUICK START',`<div class="button-row"><button class="outline-button" data-action="add-image">＋ IMAGE</button><button class="outline-button" data-action="add-text">T TEXT</button></div><div class="button-row"><button class="outline-button" data-action="add-rect">▣ SHAPE</button><button class="outline-button" data-action="export">↗ EXPORT</button></div><div class="callout">THE FORMULA: <strong>RAW IMAGE → THRESHOLD → GRAIN → MASK → BINARY PRINT</strong><br>Upload any photo, draw an unruly lasso around a subject, then adjust its ink density to blend it into the poster.</div>`,'WORKFLOW');}
 function transformInspector(l){return section('01 — TRANSFORM',`<div class="field-pair">${ninput('layer','x','X / POSITION')}${ninput('layer','y','Y / POSITION')}${l.type!=='text'?ninput('layer','w','WIDTH / PX',10,4000)+ninput('layer','h','HEIGHT / PX',10,4000):ninput('layer','fontSize','FONT SIZE',4,800)}</div>${range('layer.angle','Rotation',-180,180,1,'°')}<div class="button-row"><button class="outline-button" data-action="center-h">CENTER H</button><button class="outline-button" data-action="center-v">CENTER V</button></div>`,'GEOMETRY');}
 function compositionInspector(l){return section('02 — COMPOSITING',`${range('layer.opacity','Opacity',0,100)}${selectField('layer.blend','Blend mode',blends)}<p class="section-note">${l.type==='texture'?'Blend this texture with the layers below. Opacity controls its strength.':'<strong>Layer opacity</strong> is ordinary transparency. <strong>Ink density</strong> in the print engine deletes dots instead, leaving ink fully opaque.'}</p>`,'LAYER');}
-function fxInspector(l){return section('03 — PRINT ENGINE',`<div class="mode-grid">${[['threshold','THRESH'],['dither','DITHER'],['halftone','HALFTONE'],['duotone','2-TONE']].map(([mode,label])=>`<button class="${l.fx.mode===mode?'active':''}" data-mode="${mode}">${label}</button>`).join('')}</div>
-    ${range('layer.fx.threshold','Threshold',0,255,1,'')}${range('layer.fx.contrast','Contrast',10,350,1,'%')}${range('layer.fx.brightness','Exposure',-100,100,1,'')}${range('layer.fx.gamma','Gamma',20,300,1,'%')}${range('layer.fx.adaptive','Local contrast',0,100,1,'%')}${color('layer.fx.ink','Primary ink')}${l.fx.mode==='duotone'?color('layer.fx.secondInk','Secondary ink'):''}
-    <label class="ins-row"><span class="ins-label">Invert</span><input type="checkbox" data-prop="layer.fx.invert" ${l.fx.invert?'checked':''}><span class="section-note">Switch positive / negative</span></label>`,'TONE & INK')
+function fxControl(key,title,min,max,step=1,unit=''){
+  const path='layer.fx.'+key,value=prop(path);return `<div class="fx-control"><label>${title}<span>${unit}</span></label><div><input type="range" aria-label="${title}" data-prop="${path}" min="${min}" max="${max}" step="${step}" value="${value}"><input type="number" aria-label="${title} value" data-prop="${path}" min="${min}" max="${max}" step="${step}" value="${value}"></div></div>`;
+}
+function updateAnalysisUI(){const l=selected(),analysis=l&&imageAnalysis.get(l.id),root=$('#fx-histogram');if(!analysis||!root)return;
+  const max=Math.max(1,...analysis.histogram);root.innerHTML=analysis.histogram.map((count,i)=>`<rect x="${i}" y="${40-count/max*40}" width="1" height="${count/max*40}"/>`).join('')+`<line x1="${l.fx.threshold}" x2="${l.fx.threshold}" y1="0" y2="40"/>`;
+  $('#fx-status').textContent=`${analysis.coverage.toFixed(1)}% INK · LIVE PREVIEW`;
+}
+const fxPresets={clean:{...printDefaults,grain:0,grit:0,contrast:100},photocopy:{...printDefaults,grain:10,grit:5,contrast:180,threshold:140},detail:{...printDefaults,grain:0,grit:0,contrast:110,adaptive:65,localMethod:'sauvola',localRadius:24,sharpen:20},linework:{...printDefaults,grain:0,grit:0,contrast:150,threshold:110,adaptive:75,localRadius:16,localBias:-12,denoise:15}};
+function fxInspector(l){return section('THRESHOLD / PRINT EFFECT',`<div class="mode-grid">${[['threshold','THRESH'],['dither','DITHER'],['halftone','HALFTONE'],['duotone','2-TONE']].map(([mode,label])=>`<button class="${l.fx.mode===mode?'active':''}" data-mode="${mode}">${label}</button>`).join('')}</div>
+    <svg id="fx-histogram" class="fx-histogram" viewBox="0 0 256 40" role="img" aria-label="Image tone histogram and threshold position"></svg><div id="fx-status" class="section-note" role="status">Updating preview…</div>
+    ${fxControl('threshold','Threshold',0,255,.1)}<div class="button-row"><button class="outline-button" id="fx-auto">AUTO THRESHOLD</button><button class="outline-button" id="fx-compare" aria-pressed="false">HOLD ORIGINAL</button></div>
+    <div class="fx-presets">${[['clean','CLEAN'],['photocopy','PHOTOCOPY'],['detail','DETAIL'],['linework','LINEWORK']].map(([key,label])=>`<button data-fx-preset="${key}" class="outline-button">${label}</button>`).join('')}</div>
+    ${fxControl('contrast','Contrast',10,350,1,'%')}${fxControl('brightness','Exposure',-100,100,.1)}${fxControl('gamma','Gamma',20,300,1,'%')}
+    <details class="fx-details"><summary>LEVELS & DETAIL</summary>${fxControl('blackPoint','Black point',0,254)}${fxControl('whitePoint','White point',1,255)}${fxControl('denoise','Denoise',0,100,1,'%')}${fxControl('sharpen','Detail boost',0,100,1,'%')}</details>
+    <details class="fx-details" ${l.fx.adaptive?'open':''}><summary>LOCAL THRESHOLD</summary>${fxControl('adaptive','Local strength',0,100,1,'%')}${selectField('layer.fx.localMethod','Method',[['mean','Local mean'],['sauvola','Detail / Sauvola']])}${fxControl('localRadius','Neighborhood',1,128,1,'px')}${fxControl('localBias','Local bias',-100,100,.1)}<p class="section-note">Local threshold follows uneven lighting. Neighborhood controls the size of detail; bias adds or removes ink.</p></details>
+    ${color('layer.fx.ink','Primary ink')}${l.fx.mode==='duotone'?color('layer.fx.secondInk','Secondary ink'):''}
+    <label class="ins-row"><span class="ins-label">Invert</span><input type="checkbox" data-prop="layer.fx.invert" ${l.fx.invert?'checked':''}><span class="section-note">Switch positive / negative</span></label><button class="utility-button wide" id="fx-reset">RESET EFFECT</button>`,'LIVE')
     +section('04 — GRAIN LAB',`${range('layer.fx.grain','Film grain',0,100,1,'%')}${range('layer.fx.grainSize','Grain scale',0,100,1,'%')}${range('layer.fx.grit','Ink erosion',0,100,1,'%')}${range('layer.fx.inkDensity','Ink density',0,100,1,'%')}${l.fx.mode==='dither'?range('layer.fx.dither','Dither matrix',0,100,1,'%'):''}${l.fx.mode==='halftone'?range('layer.fx.halftone','Screen LPI',1,13,1,'')+range('layer.fx.angle','Screen angle',0,90,1,'°'):''}
     <div class="callout"><strong>100% OPAQUE INK · SPATIALLY THINNED</strong><br>At 60% density, missing pixels show the layers below. Surviving printed pixels retain 255 alpha. Not a transparency hack.</div><div class="button-row"><button class="outline-button" data-action="grain-fine">FINE DUST</button><button class="outline-button" data-action="grain-heavy">ROUGH INK</button></div>`,'PHYSICAL PRINT')
     +section('05 — CUTOUT / MASK',`<div class="mode-grid"><button data-action="mask-none" class="${l.mask.type==='none'?'active':''}">NO MASK</button><button data-action="mask-rough" class="${l.mask.type==='rough'?'active':''}">ROUGH CUT</button><button data-action="lasso" class="${l.mask.type==='lasso'?'active':''}">LASSO</button></div>
@@ -210,20 +190,26 @@ function textureInspector(l){return section('03 — TIPTOP '+(l.libraryKind==='p
 function textInspector(l){const fonts=['Anton','Archivo Black','Bebas Neue','Barlow Condensed','Oswald','Space Grotesk','Inter','IBM Plex Mono'];return section('03 — TYPOGRAPHY',`<div class="field-stack"><label>TEXT CONTENT</label><textarea class="full-textarea" data-prop="layer.text">${esc(l.text)}</textarea></div><div class="subhead">TYPE FAMILY / GOOGLE FONTS</div>${selectField('layer.font','Typeface',fonts.map(x=>[x,x]))}<div class="field-pair">${ninput('layer','weight','WEIGHT',100,900,100)}${ninput('layer','fontSize','SIZE / PX',4,800)}</div>${range('layer.tracking','Tracking',-20,50,.5,'px')}${range('layer.stretch','X stretch',30,300,1,'%')}${range('layer.lineHeight','Leading',50,250,1,'%')}${color('layer.color','Ink color')}${range('layer.distress','Text distress',0,100)}${range('layer.outline','Outline',0,12,1,'px')}<p class="section-note">True individual-glyph tracking, horizontal type stretching, variable type weight, multi-line leading and distressed letterpress printing.</p>`,'TYPE LAB');}
 function shapeInspector(l){return section('03 — SHAPE',`${selectField('layer.shape','Geometry',[['rect','Rectangle'],['ellipse','Ellipse']])}${color('layer.fill','Fill ink')}${color('layer.stroke','Outline ink')}${range('layer.strokeWidth','Stroke',0,40,1,'px')}<div class="button-row"><button class="outline-button" data-action="shape-full">FILL CANVAS</button><button class="outline-button" data-action="duplicate">DUPLICATE</button></div>`,'VECTOR');}
 function renderInspector(){const l=selected();$('#active-type').textContent=l?(l.type==='texture'?(l.libraryKind==='paper'?'PAPER':l.texture.mode==='stamp'?'STAMP':'TEXTURE'):l.type.toUpperCase()):'ARTBOARD';if(!l){inspector.innerHTML=canvasInspector();wireInspector();return;}
-  inspector.innerHTML=`<div class="ins-section" style="padding:12px 20px"><input class="full-input" aria-label="Layer name" data-prop="layer.name" value="${esc(l.name)}">${l.type==='image'?`<button class="utility-button wide" data-action="replace-image" ${l.locked?'disabled':''}>REPLACE IMAGE</button>`:''}</div>`+transformInspector(l)+compositionInspector(l)+(l.type==='texture'?textureInspector(l):l.type==='image'?fxInspector(l):l.type==='text'?textInspector(l):shapeInspector(l))+section('06 — LAYER ACTIONS',`<div class="button-row"><button class="outline-button" data-action="duplicate">⧉ DUPLICATE</button><button class="outline-button" data-action="delete">⌫ DELETE</button></div><div class="button-row"><button class="outline-button" data-action="up">↑ UP</button><button class="outline-button" data-action="down">↓ DOWN</button></div><button class="utility-button wide" data-action="toggle-lock">${l.locked?'UNLOCK LAYER':'LOCK LAYER'}</button>`,'EDIT');wireInspector();}
-function updateProp(path,val){const target=path.startsWith('canvas.')?data.canvas:selected();if(!target)return;const p=path.startsWith('canvas.')?path.slice(7):path.slice(6),keys=p.split('.');let holder=target;for(let i=0;i<keys.length-1;i++)holder=holder[keys[i]];const k=keys.at(-1),old=holder[k];if(typeof old==='number')val=Number(val);else if(typeof old==='boolean')val=!!val;if(Number.isNaN(val))return; if(['w','h','fontSize'].includes(k)&&typeof val==='number')val=Math.max(k==='fontSize'?4:10,val);
-  if(old===val)return;remember();holder[k]=val;
+  inspector.innerHTML=`<div class="ins-section" style="padding:12px 20px"><input class="full-input" aria-label="Layer name" data-prop="layer.name" value="${esc(l.name)}">${l.type==='image'?`<button class="utility-button wide" data-action="replace-image" ${l.locked?'disabled':''}>REPLACE IMAGE</button>`:''}</div>`+(l.type==='image'?fxInspector(l):'')+transformInspector(l)+compositionInspector(l)+(l.type==='texture'?textureInspector(l):l.type==='text'?textInspector(l):l.type==='shape'?shapeInspector(l):'')+section('06 — LAYER ACTIONS',`<div class="button-row"><button class="outline-button" data-action="duplicate">⧉ DUPLICATE</button><button class="outline-button" data-action="delete">⌫ DELETE</button></div><div class="button-row"><button class="outline-button" data-action="up">↑ UP</button><button class="outline-button" data-action="down">↓ DOWN</button></div><button class="utility-button wide" data-action="toggle-lock">${l.locked?'UNLOCK LAYER':'LOCK LAYER'}</button>`,'EDIT');wireInspector();}
+function updateProp(path,val){const target=path.startsWith('canvas.')?data.canvas:selected();if(!target)return;const p=path.startsWith('canvas.')?path.slice(7):path.slice(6),keys=p.split('.');let holder=target;for(let i=0;i<keys.length-1;i++)holder=holder[keys[i]];const k=keys.at(-1),old=holder[k];if(path.startsWith('layer.fx.')&&typeof val!=='boolean'){const bounds={threshold:[0,255],contrast:[10,350],brightness:[-100,100],gamma:[20,300],blackPoint:[0,254],whitePoint:[1,255],denoise:[0,100],sharpen:[0,100],adaptive:[0,100],localRadius:[1,128],localBias:[-100,100]};if(bounds[k])val=clamp(Number(val),...bounds[k]);}if(typeof old==='number')val=Number(val);else if(typeof old==='boolean')val=!!val;if(Number.isNaN(val))return; if(['w','h','fontSize'].includes(k)&&typeof val==='number')val=Math.max(k==='fontSize'?4:10,val);
+  if(old===val)return;if(fxGesture?.path===path){if(!fxGesture.recorded){remember(true);fxGesture.recorded=true;}}else remember();holder[k]=val;if(path==='layer.fx.blackPoint')holder.whitePoint=Math.max(holder.whitePoint,val+1);if(path==='layer.fx.whitePoint')holder.blackPoint=Math.min(holder.blackPoint,val-1);
   if(path==='layer.text')target.name=val.replace(/\n/g,' ').slice(0,25)||'Text';
   if(path==='layer.font')document.fonts.load(fontSpec(target)).then(schedule);
+  if(path.startsWith('layer.fx.')||path.startsWith('layer.mask.'))latestJobs.delete(target.id);
   if(path.startsWith('layer.texture.')||path.startsWith('layer.fx.')||path.startsWith('layer.mask.')||path.startsWith('layer.text')||path.startsWith('layer.font')||path.startsWith('layer.distress')||path.startsWith('layer.tracking'))layerCache.clear();
   if(path==='canvas.w'||path==='canvas.h')setZoom(zoom);
   markDirty();schedule();
 }
 function wireInspector(){inspector.querySelectorAll('[data-prop]').forEach(el=>{
-  const path=el.dataset.prop;el.addEventListener(el.type==='range'||el.tagName==='TEXTAREA'?'input':'change',()=>{updateProp(path,el.type==='checkbox'?el.checked:el.value);const d=inspector.querySelector(`[data-display="${path}"]`);if(d){const suffix=d.textContent.match(/(%|px|°)$/)?.[0]||'';d.textContent=f(el.value,Number(el.step)<1?1:0)+suffix;}if(el.type==='color'&&el.nextElementSibling)el.nextElementSibling.textContent=el.value.toUpperCase();if(['layer.font','layer.text','layer.name','layer.shape','layer.texture.mode'].includes(path))renderLayers();if(path==='layer.texture.mode')renderInspector();});
+  const path=el.dataset.prop;if(path.startsWith('layer.fx.')){const begin=()=>{fxGesture={path,recorded:false};},end=()=>{fxGesture=null;};el.addEventListener('pointerdown',begin);el.addEventListener('focus',begin);el.addEventListener('pointerup',end);el.addEventListener('blur',end);}el.addEventListener(el.type==='range'||(el.type==='number'&&path.startsWith('layer.fx.'))||el.tagName==='TEXTAREA'?'input':'change',()=>{updateProp(path,el.type==='checkbox'?el.checked:el.value);inspector.querySelectorAll(path.startsWith('layer.fx.')?'[data-prop^="layer.fx."]':`[data-prop="${path}"]`).forEach(other=>{if(other!==el){if(other.type==='checkbox')other.checked=prop(other.dataset.prop);else other.value=prop(other.dataset.prop);}});const d=inspector.querySelector(`[data-display="${path}"]`);if(d){const suffix=d.textContent.match(/(%|px|°)$/)?.[0]||'';d.textContent=f(el.value,Number(el.step)<1?1:0)+suffix;}if(el.type==='color'&&el.nextElementSibling)el.nextElementSibling.textContent=el.value.toUpperCase();if(['layer.font','layer.text','layer.name','layer.shape','layer.texture.mode'].includes(path))renderLayers();if(path==='layer.texture.mode')renderInspector();});
   });
   inspector.querySelectorAll('[data-mode]').forEach(el=>el.addEventListener('click',()=>mutate(()=>{selected().fx.mode=el.dataset.mode;invalidate();},{inspectorRefresh:true})));
   inspector.querySelectorAll('[data-action]').forEach(el=>el.addEventListener('click',()=>runAction(el.dataset.action)));
+  updateAnalysisUI();
+  inspector.querySelectorAll('[data-fx-preset]').forEach(button=>button.onclick=()=>{remember(true);mutate(()=>{const l=selected(),ink=l.fx.ink;l.fx={...fxPresets[button.dataset.fxPreset],ink};layerCache.clear();},{historyEntry:false,inspectorRefresh:true});});
+  const reset=$('#fx-reset');if(reset)reset.onclick=()=>{remember(true);mutate(()=>{selected().fx={...printDefaults,grain:0,grit:0,contrast:100};layerCache.clear();},{historyEntry:false,inspectorRefresh:true});};
+  const auto=$('#fx-auto');if(auto)auto.onclick=async()=>{const layer=selected();auto.disabled=true;try{await processedImage(layer,1,true,true);if(selected()===layer){const analysis=imageAnalysis.get(layer.id);if(analysis){remember(true);mutate(()=>{layer.fx.threshold=analysis.autoThreshold;layerCache.clear();},{historyEntry:false,inspectorRefresh:true});}}}catch(error){if(error.name!=='AbortError')notify('AUTO THRESHOLD FAILED');}finally{auto.disabled=false;}};
+  const compare=$('#fx-compare');if(compare){const show=()=>{compareImageId=selected()?.id;compare.setAttribute('aria-pressed','true');schedule();},hide=()=>{compareImageId=null;compare.setAttribute('aria-pressed','false');schedule();};compare.onpointerdown=show;compare.onpointerup=hide;compare.onpointerleave=hide;compare.onpointercancel=hide;compare.onblur=hide;compare.onkeydown=e=>{if(e.key===' '||e.key==='Enter'){e.preventDefault();show();}};compare.onkeyup=hide;}
   const bs=$('#brush-size');if(bs)bs.addEventListener('input',e=>{brushSize=Number(e.target.value);$('#brush-size-label').textContent=brushSize+'px';});
 }
 function newText(){const l=mkText('YOUR TEXT',data.canvas.w*.17,data.canvas.h*.44,95);mutate(()=>{data.layers.push(l);data.selectedId=l.id;},{layerRefresh:true,inspectorRefresh:true});setTool('select');}
@@ -316,9 +302,16 @@ function openLibrary(category='paper'){
   });
   $('#modal-close').focus();
 }
+async function prepareEffects(scale){
+  for(const l of data.layers.filter(l=>l.visible)){
+    if(l.type==='image')await processedImage(l,scale,false,true);else if(l.type==='texture')await textureCanvas(l,scale,true);
+    else if(l.type==='text'&&l.distress){textCanvas(l,scale,true);const jobs=[...processing.entries()].filter(([key])=>key.startsWith('text:'+l.id+':'));await Promise.all(jobs.map(([,promise])=>promise));}
+  }
+  if(data.canvas.paper>0)await buildPaper(scale,true);
+}
 function openExport(){const root=modal(`<div class="inspector-tiny">OUTPUT / PRESS-READY</div><h2>Export artwork<span style="color:#ff553e">.</span></h2><p>Local, full-resolution compositor. All grain, masks, vector type and binary-ink dropout are burned into the exported PNG.</p><label class="export-label">OUTPUT RESOLUTION</label><div class="export-choice" id="export-sizes"><button data-scale="1">1×<br><small>SCREEN</small></button><button data-scale="2" class="active">2×<br><small>PRINT</small></button><button data-scale="3">3×<br><small>HI-RES</small></button></div><p id="export-meta" class="section-note">${data.canvas.w*2} × ${data.canvas.h*2} px · transparent pixels only inside image masks</p><button class="primary-button" id="render-png">↗ RENDER PNG</button><div class="modal-tip">Large exports may take a few seconds. Image processing is entirely on-device and works offline after initial font load.</div>`);
   let scale=2;root.querySelectorAll('[data-scale]').forEach(b=>b.onclick=()=>{scale=Number(b.dataset.scale);root.querySelectorAll('[data-scale]').forEach(x=>x.classList.toggle('active',x===b));$('#export-meta').textContent=`${data.canvas.w*scale} × ${data.canvas.h*scale} px · RGB PNG`;});
-  $('#render-png').onclick=async()=>{if(isBusy)return;isBusy=true;$('#render-png').textContent='LOADING ASSETS…';const loaded=await Promise.all(data.layers.filter(l=>l.visible&&l.src).map(l=>getImage(l.src).promise));if(loaded.some(ok=>!ok)){notify('EXPORT STOPPED: IMAGE COULD NOT BE LOADED');isBusy=false;$('#render-png').textContent='↗ RETRY PNG';return;}$('#render-png').textContent='RENDERING…';setTimeout(()=>{try{const c=newCanvas(data.canvas.w*scale,data.canvas.h*scale);drawComposition(c.getContext('2d'),scale);c.toBlob(blob=>{if(blob){download(blob,(data.project||'poster').toLowerCase().replace(/[^a-z0-9]+/g,'-')+`-${scale}x.png`);notify('POSTER EXPORTED / '+c.width+' × '+c.height);}else notify('EXPORT FAILED');isBusy=false;root.hidden=true;},'image/png');}catch(e){console.error(e);notify('EXPORT FAILED: '+e.message);isBusy=false;root.hidden=true;}},60);};}
+  $('#render-png').onclick=async()=>{if(isBusy)return;isBusy=true;$('#render-png').textContent='LOADING ASSETS…';const loaded=await Promise.all(data.layers.filter(l=>l.visible&&l.src).map(l=>getImage(l.src).promise));if(loaded.some(ok=>!ok)){notify('EXPORT STOPPED: IMAGE COULD NOT BE LOADED');isBusy=false;$('#render-png').textContent='↗ RETRY PNG';return;}$('#render-png').textContent='PROCESSING…';try{await prepareEffects(scale);}catch{notify('EXPORT STOPPED: PROCESSING FAILED');isBusy=false;$('#render-png').textContent='↗ RETRY PNG';return;}$('#render-png').textContent='RENDERING…';setTimeout(()=>{try{const c=newCanvas(data.canvas.w*scale,data.canvas.h*scale);drawComposition(c.getContext('2d'),scale);c.toBlob(blob=>{if(blob){download(blob,(data.project||'poster').toLowerCase().replace(/[^a-z0-9]+/g,'-')+`-${scale}x.png`);notify('POSTER EXPORTED / '+c.width+' × '+c.height);}else notify('EXPORT FAILED');isBusy=false;root.hidden=true;},'image/png');}catch(e){console.error(e);notify('EXPORT FAILED: '+e.message);isBusy=false;root.hidden=true;}},60);};}
 function openHelp(){modal(`<div class="inspector-tiny">MANUAL / FIELD NOTES</div><h2>Make some noise.</h2><p>Print-first brutalist layout engine. Combine thresholded photos, editable rough cutouts, oversized type, and vector geometry.</p><div class="shortcuts"><span><kbd>V</kbd> Select</span><span><kbd>H</kbd> Pan</span><span><kbd>T</kbd> Add type</span><span><kbd>R</kbd> Rectangle</span><span><kbd>E</kbd> Ellipse</span><span><kbd>L</kbd> Freehand lasso</span><span><kbd>B</kbd> Erase mask</span><span><kbd>G</kbd> Restore mask</span><span><kbd>⌘ / Ctrl + Z</kbd> Undo</span><span><kbd>Delete</kbd> Remove</span><span><kbd>⌘ / Ctrl + S</kbd> Save</span><span><kbd>+</kbd> Zoom in</span></div><p class="tagline">TO MAKE A CUTOUT</p><p>Upload an image → select it in Layers → press L → trace the subject by dragging around its silhouette → release. Press B and drag to chip away edges, or G to restore. Raise grain and lower Ink density for the photo to melt into adjacent imagery.</p><button class="primary-button" id="help-ok">BACK TO STUDIO →</button>`);$('#help-ok').onclick=()=>$('#modal-root').hidden=true;}
 function refreshAll(){renderLayers();renderInspector();updateHistoryUI();setZoom(zoom);schedule();}
 function bind(){
@@ -341,6 +334,6 @@ function bind(){
   window.addEventListener('resize',()=>{if(window.innerWidth<760)fitZoom();});
 }
 function init(){try{const autosave=localStorage.getItem('inknoise-autosave');if(autosave){const saved=JSON.parse(autosave);if(saved.canvas&&Array.isArray(saved.layers))data=saved;}}catch(e){console.warn('Autosave unavailable',e);}
-  $('#project-name').value=data.project;for(const l of data.layers)if(l.src)getImage(l.src);
+  $('#project-name').value=data.project;for(const l of data.layers){if(l.type==='image')l.fx={...defaultFX(),...l.fx};if(l.src)getImage(l.src);}
   bind();refreshAll();requestAnimationFrame(()=>fitZoom());document.fonts.ready.then(()=>{layerCache.clear();schedule();});}
 init();
