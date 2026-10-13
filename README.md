@@ -42,3 +42,18 @@ No server-side image processing or external image uploads. Image data remains in
 ## Notes
 
 A built-in browser's `file://` restrictions can interfere with loading modules and local image assets; run a local static server as above. Imported large raster images saved in local autosave can exceed browser storage quotas; use **SAVE** to download the complete project JSON. Native export uses the browser's PNG encoder, with RGB output over the selected paper color.
+
+## Tiptop library
+
+Open **LIBRARY** in the tool rail for five paper stocks and twenty ink distress stamps.
+Paper is added beneath the artwork in its original tones. Ink stamps are tinted,
+transparent layers with selectable light/dark source polarity. In the inspector,
+switch a stamp to **Original overlay** to use its original image with Multiply,
+Screen, Soft light, and the other existing blend modes. All library layers support
+position, size, rotation, opacity, duplication, stacking, history, project files,
+and PNG export. The library uses the owner's optimized WebP shortlist, small browse
+thumbnails, on-demand source loading, and cached stamp rendering.
+
+The optional renderer checks run with `node --test tests/library-render.test.mjs`
+when `@napi-rs/canvas` is installed for development. Set `INKNOISE_CANVAS_MODULE`
+to its module path if it is installed outside this repo; the browser app needs no packages.
