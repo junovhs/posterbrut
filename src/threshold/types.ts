@@ -11,9 +11,18 @@ export interface Analysis {sourceHistogram:number[];histogram:number[];coverage:
 export interface Frame {width:number;height:number;rgba:Uint8ClampedArray}
 export type Task =
  |{kind:'image';fx:Partial<Effects>;seed:number;analysisOnly?:boolean}
+ |{kind:'paint';strokes:PaintStroke[]}
  |{kind:'paper';amount:number;seed:number}
  |{kind:'distress';amount:number;seed:number}
  |{kind:'stamp';color:string;polarity:'dark'|'light'};
 export interface WorkRequest {id:number;sourceKey:string;width:number;height:number;bitmap?:ImageBitmap;task:Task}
 export type WorkResponse={id:number;bitmap:ImageBitmap;analysis?:Analysis}|{id:number;error:string};
 export interface Result {bitmap:ImageBitmap;analysis?:Analysis}
+export interface BrushPreset {
+ id:string;name:string;set:string;shape:string;grain?:string;
+ spacing:number;scatter:number;jitter:number;follow:boolean;angle:number;
+ pressureSize:number;pressureOpacity:number;minSize:number;minOpacity:number;
+ sizeCurve:number[][];opacityCurve:number[][];shapeInverted:boolean;grainInverted:boolean;grainDepth:number;
+}
+export type PaintPoint=[number,number,number];
+export interface PaintStroke {id:string;brush:string;mode:'paint'|'erase';color:string;size:number;opacity:number;seed:number;points:PaintPoint[]}

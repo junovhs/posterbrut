@@ -10,7 +10,7 @@ export class ThresholdClient {
  private nextId=0;
  private failure:Error|null=null;
  readonly stats={submitted:0,coalesced:0,completed:0};
- constructor(){this.worker=new Worker(new URL('./worker.js',import.meta.url),{type:'module'});this.worker.onmessage=(event:MessageEvent<WorkResponse>)=>this.receive(event.data);this.worker.onerror=()=>{const error=new Error('Image processor failed. Reload the app to restart it.');this.failure=error;this.active?.reject(error);this.active=null;for(const job of this.queue)job.reject(error);this.queue=[];};}
+ constructor(workerURL=new URL('./worker.js',import.meta.url)){this.worker=new Worker(workerURL,{type:'module'});this.worker.onmessage=(event:MessageEvent<WorkResponse>)=>this.receive(event.data);this.worker.onerror=()=>{const error=new Error('Image processor failed. Reload the app to restart it.');this.failure=error;this.active?.reject(error);this.active=null;for(const job of this.queue)job.reject(error);this.queue=[];};}
  run(slot:string,sourceKey:string,width:number,height:number,task:Task,source?:()=>Promise<ImageBitmap>):Promise<Result>{
   if(this.failure)return Promise.reject(this.failure);this.stats.submitted++;
   return new Promise((resolve,reject)=>{const previous=this.queue.findIndex(job=>job.slot===slot);if(previous>=0){this.queue.splice(previous,1)[0]!.reject(new DOMException('Superseded','AbortError'));this.stats.coalesced++;}this.queue.push({id:++this.nextId,slot,sourceKey,width,height,task,source,resolve,reject,retried:false});void this.pump();});

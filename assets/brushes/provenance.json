@@ -1,0 +1,527 @@
+[
+  {
+    "id": "low-ink",
+    "archive": "01_Inking_and_Comics/Master_Ink/Master_Ink_2022.brushset",
+    "member": "A0D31079-CFB6-42DE-915B-FE0BFCEDFEF5/Brush.archive",
+    "originalName": "Low Ink",
+    "archiveSha256": "59ceb510d084a16b4ebf9176b52aa2ec4b167f5f64671b6105478b5d19b846f5",
+    "assets": {
+      "shape": {
+        "member": "A0D31079-CFB6-42DE-915B-FE0BFCEDFEF5/Shape.png",
+        "sourceSha256": "4121430d78b0f92e8763a168ae94e635088c96e72ad3274850c7edda07fc4c22",
+        "outputSha256": "5af7575a9db88a19574497958a9db184ce0ab9ffdd12ed7a9cca90fbfb8b836f",
+        "originalSize": [
+          1378,
+          1378
+        ],
+        "size": [
+          512,
+          512
+        ]
+      }
+    },
+    "settings": {
+      "plotSpacing": 0.0,
+      "shapeScatter": 0.0,
+      "plotJitter": 0.0,
+      "shapeRotation": -1.0,
+      "shapeAngle": 0.0,
+      "dynamicsPressureSize": 0.09841663390398026,
+      "dynamicsPressureOpacity": 0.0,
+      "minSize": 0.036241523921489716,
+      "maxSize": 0.19398480653762817,
+      "minOpacity": 0.0,
+      "grainDepth": 1.0,
+      "shapeInverted": false,
+      "textureInverted": true
+    }
+  },
+  {
+    "id": "flat-dry",
+    "archive": "01_Inking_and_Comics/Master_Ink/Master_Ink_2022.brushset",
+    "member": "979B0EC3-4760-4A28-BFCD-FC31671D6BBA/Brush.archive",
+    "originalName": "Flat Dry",
+    "archiveSha256": "59ceb510d084a16b4ebf9176b52aa2ec4b167f5f64671b6105478b5d19b846f5",
+    "assets": {
+      "shape": {
+        "member": "979B0EC3-4760-4A28-BFCD-FC31671D6BBA/Shape.png",
+        "sourceSha256": "c5ad97026a3b628d5d0b95a919d60613af07e288161259210d1715aea13d91cd",
+        "outputSha256": "42e245baa76550d036f5b863f021c00e470de7943f29a7cacd6473423ab78a21",
+        "originalSize": [
+          2048,
+          2048
+        ],
+        "size": [
+          512,
+          512
+        ]
+      }
+    },
+    "settings": {
+      "plotSpacing": 0.0008334235171787441,
+      "shapeScatter": 0.11908047646284103,
+      "plotJitter": 0.0,
+      "shapeRotation": 0.0,
+      "shapeAngle": -0.004540443420410156,
+      "dynamicsPressureSize": 0.3323177993297577,
+      "dynamicsPressureOpacity": 0.20000000298023224,
+      "minSize": 0.04177464544773102,
+      "maxSize": 1.6250677108764648,
+      "minOpacity": 0.0,
+      "grainDepth": 1.0,
+      "shapeInverted": false,
+      "textureInverted": false
+    }
+  },
+  {
+    "id": "dry-ink-brush-1-1-1",
+    "archive": "01_Inking_and_Comics/Master_Ink/Master_Ink_2022.brushset",
+    "member": "979B0EC3-4760-4A28-BFCD-FC31671D6BBA/Sub01/Brush.archive",
+    "originalName": "Dry Ink Brush 1 1 1",
+    "archiveSha256": "59ceb510d084a16b4ebf9176b52aa2ec4b167f5f64671b6105478b5d19b846f5",
+    "assets": {
+      "shape": {
+        "member": "979B0EC3-4760-4A28-BFCD-FC31671D6BBA/Sub01/Shape.png",
+        "sourceSha256": "c5ad97026a3b628d5d0b95a919d60613af07e288161259210d1715aea13d91cd",
+        "outputSha256": "42e245baa76550d036f5b863f021c00e470de7943f29a7cacd6473423ab78a21",
+        "originalSize": [
+          2048,
+          2048
+        ],
+        "size": [
+          512,
+          512
+        ]
+      }
+    },
+    "settings": {
+      "plotSpacing": 0.0007485998212359846,
+      "shapeScatter": 0.19385218620300293,
+      "plotJitter": 0.0,
+      "shapeRotation": 0.0,
+      "shapeAngle": 0.0,
+      "dynamicsPressureSize": 0.6751388907432556,
+      "dynamicsPressureOpacity": 0.0,
+      "minSize": 0.04177464544773102,
+      "maxSize": 0.2865575850009918,
+      "minOpacity": 0.0,
+      "grainDepth": 1.0,
+      "shapeInverted": false,
+      "textureInverted": true
+    }
+  },
+  {
+    "id": "watery-brush",
+    "archive": "01_Inking_and_Comics/Master_Ink/Master_Ink_2022.brushset",
+    "member": "29EBA523-D526-40E5-9BAF-AA2189317F62/Brush.archive",
+    "originalName": "Watery Brush",
+    "archiveSha256": "59ceb510d084a16b4ebf9176b52aa2ec4b167f5f64671b6105478b5d19b846f5",
+    "assets": {
+      "shape": {
+        "member": "29EBA523-D526-40E5-9BAF-AA2189317F62/Shape.png",
+        "sourceSha256": "91849f252f1659ac16b7c84be48439621334b3fd3cb92bb363d5a7c0167211ed",
+        "outputSha256": "76d1e935e9c728fbe881416713589f396e548bfd361cc973dd68eaeba4661a53",
+        "originalSize": [
+          1470,
+          1470
+        ],
+        "size": [
+          512,
+          512
+        ]
+      },
+      "grain": {
+        "member": "29EBA523-D526-40E5-9BAF-AA2189317F62/Grain.png",
+        "sourceSha256": "57d456af6048149f9b4905dc9fdc0b75cbf54756146bcb9b752574aa501678ad",
+        "outputSha256": "6ca12e5f235db2c214261118cee25ac537adbdb6bbe811d9971cae75920e6919",
+        "originalSize": [
+          2048,
+          2048
+        ],
+        "size": [
+          512,
+          512
+        ]
+      }
+    },
+    "settings": {
+      "plotSpacing": 0.0,
+      "shapeScatter": 0.05538632348179817,
+      "plotJitter": 0.0,
+      "shapeRotation": 0.0,
+      "shapeAngle": 0.0,
+      "dynamicsPressureSize": 1.0,
+      "dynamicsPressureOpacity": 0.0,
+      "minSize": 0.022194307297468185,
+      "maxSize": 0.7441287636756897,
+      "minOpacity": 0.0,
+      "grainDepth": 1.0,
+      "shapeInverted": false,
+      "textureInverted": false
+    }
+  },
+  {
+    "id": "dry-old-round",
+    "archive": "01_Inking_and_Comics/Master_Ink/Master_Ink_2022.brushset",
+    "member": "9FFB6152-3BED-44FD-9319-2194E5830B6B/Brush.archive",
+    "originalName": "Dry Old Round",
+    "archiveSha256": "59ceb510d084a16b4ebf9176b52aa2ec4b167f5f64671b6105478b5d19b846f5",
+    "assets": {
+      "shape": {
+        "member": "9FFB6152-3BED-44FD-9319-2194E5830B6B/Shape.png",
+        "sourceSha256": "c5ad97026a3b628d5d0b95a919d60613af07e288161259210d1715aea13d91cd",
+        "outputSha256": "42e245baa76550d036f5b863f021c00e470de7943f29a7cacd6473423ab78a21",
+        "originalSize": [
+          2048,
+          2048
+        ],
+        "size": [
+          512,
+          512
+        ]
+      }
+    },
+    "settings": {
+      "plotSpacing": 0.0006687159766443074,
+      "shapeScatter": 2.0,
+      "plotJitter": 0.0,
+      "shapeRotation": 0.0,
+      "shapeAngle": 0.0,
+      "dynamicsPressureSize": 0.6751388907432556,
+      "dynamicsPressureOpacity": 0.0,
+      "minSize": 0.04177464544773102,
+      "maxSize": 1.0,
+      "minOpacity": 0.0,
+      "grainDepth": 1.0,
+      "shapeInverted": false,
+      "textureInverted": false
+    }
+  },
+  {
+    "id": "bleeding-edge",
+    "archive": "01_Inking_and_Comics/Master_Ink/Master_Ink_2022.brushset",
+    "member": "E4E2A6D1-F7C4-4E09-A599-F3092232A447/Brush.archive",
+    "originalName": "Bleeding Edge",
+    "archiveSha256": "59ceb510d084a16b4ebf9176b52aa2ec4b167f5f64671b6105478b5d19b846f5",
+    "assets": {
+      "shape": {
+        "member": "E4E2A6D1-F7C4-4E09-A599-F3092232A447/Shape.png",
+        "sourceSha256": "5db5d054a119c2d8487740ca47fb5de29829f433cca49d61e563a0d4bd1eaf9e",
+        "outputSha256": "b69faa86e15f00ff2f4430d9442457c751c11dbbb388319e29c19bf9d5706da9",
+        "originalSize": [
+          1517,
+          1517
+        ],
+        "size": [
+          512,
+          512
+        ]
+      },
+      "grain": {
+        "member": "E4E2A6D1-F7C4-4E09-A599-F3092232A447/Grain.png",
+        "sourceSha256": "269675965a1fd8b243da4498d4d9f683d2c0ac18300ed10d143eebb0d02206c6",
+        "outputSha256": "713c2b7b9a29cba82ab577bc462784657402d1c67a7626e7101e72708b7270ad",
+        "originalSize": [
+          1000,
+          1000
+        ],
+        "size": [
+          512,
+          512
+        ]
+      }
+    },
+    "settings": {
+      "plotSpacing": 0.0009232372976839542,
+      "shapeScatter": 2.0,
+      "plotJitter": 0.05998830497264862,
+      "shapeRotation": 0.0,
+      "shapeAngle": 0.0,
+      "dynamicsPressureSize": 0.9822221994400024,
+      "dynamicsPressureOpacity": 0.0,
+      "minSize": 0.000816184445284307,
+      "maxSize": 0.3465197682380676,
+      "minOpacity": 0.0,
+      "grainDepth": 1.0,
+      "shapeInverted": false,
+      "textureInverted": true
+    }
+  },
+  {
+    "id": "hake-wet",
+    "archive": "01_Inking_and_Comics/Master_Ink/Master_Ink_2022.brushset",
+    "member": "B3420C54-955C-4C93-A6C2-4AE148295AF8/Brush.archive",
+    "originalName": "Hake Wet",
+    "archiveSha256": "59ceb510d084a16b4ebf9176b52aa2ec4b167f5f64671b6105478b5d19b846f5",
+    "assets": {
+      "shape": {
+        "member": "B3420C54-955C-4C93-A6C2-4AE148295AF8/Shape.png",
+        "sourceSha256": "59697486fa9822daefb2a3dc730810fee12bbc40f5549e1325fa51afef11ad55",
+        "outputSha256": "793ca467bc01bbfd03c5e0e09fee7bbe11bb55a72929c2a47eddc6bb4945811b",
+        "originalSize": [
+          1999,
+          1999
+        ],
+        "size": [
+          512,
+          512
+        ]
+      },
+      "grain": {
+        "member": "B3420C54-955C-4C93-A6C2-4AE148295AF8/Grain.png",
+        "sourceSha256": "ac6d6038be78f2cdaab819f31894ca78c513392ae5864dcf6c9cf4e7fd679806",
+        "outputSha256": "16e88862dec5c2aeb68f27296b0732ea0cca643c2ede9af032197cb5e9aa3e21",
+        "originalSize": [
+          2000,
+          2000
+        ],
+        "size": [
+          512,
+          512
+        ]
+      }
+    },
+    "settings": {
+      "plotSpacing": 0.002486293436959386,
+      "shapeScatter": 0.0,
+      "plotJitter": 0.009115586057305336,
+      "shapeRotation": -0.28134021162986755,
+      "shapeAngle": 0.0,
+      "dynamicsPressureSize": 0.0,
+      "dynamicsPressureOpacity": 0.0,
+      "minSize": 0.04443732649087906,
+      "maxSize": 2.864720106124878,
+      "minOpacity": 0.0,
+      "grainDepth": 1.0,
+      "shapeInverted": false,
+      "textureInverted": false
+    }
+  },
+  {
+    "id": "fountain",
+    "archive": "01_Inking_and_Comics/Master_Ink/Master_Ink_2022.brushset",
+    "member": "9EF8C867-50F3-4C92-A743-57CDA65B574A/Brush.archive",
+    "originalName": "Fountain",
+    "archiveSha256": "59ceb510d084a16b4ebf9176b52aa2ec4b167f5f64671b6105478b5d19b846f5",
+    "assets": {
+      "shape": {
+        "member": "9EF8C867-50F3-4C92-A743-57CDA65B574A/Shape.png",
+        "sourceSha256": "91849f252f1659ac16b7c84be48439621334b3fd3cb92bb363d5a7c0167211ed",
+        "outputSha256": "76d1e935e9c728fbe881416713589f396e548bfd361cc973dd68eaeba4661a53",
+        "originalSize": [
+          1470,
+          1470
+        ],
+        "size": [
+          512,
+          512
+        ]
+      },
+      "grain": {
+        "member": "9EF8C867-50F3-4C92-A743-57CDA65B574A/Grain.png",
+        "sourceSha256": "57d456af6048149f9b4905dc9fdc0b75cbf54756146bcb9b752574aa501678ad",
+        "outputSha256": "6ca12e5f235db2c214261118cee25ac537adbdb6bbe811d9971cae75920e6919",
+        "originalSize": [
+          2048,
+          2048
+        ],
+        "size": [
+          512,
+          512
+        ]
+      }
+    },
+    "settings": {
+      "plotSpacing": 0.0,
+      "shapeScatter": 0.0,
+      "plotJitter": 0.0,
+      "shapeRotation": 0.0,
+      "shapeAngle": 0.0,
+      "dynamicsPressureSize": 1.0,
+      "dynamicsPressureOpacity": 0.0,
+      "minSize": 0.022194307297468185,
+      "maxSize": 0.7441287636756897,
+      "minOpacity": 0.0,
+      "grainDepth": 1.0,
+      "shapeInverted": false,
+      "textureInverted": false
+    }
+  },
+  {
+    "id": "crisp-comic-pen",
+    "archive": "01_Inking_and_Comics/Master_Ink/Master_Ink_2022.brushset",
+    "member": "DEB544B9-FEEC-4DE5-86B3-3344071282D4/Brush.archive",
+    "originalName": "Crisp Comic Pen",
+    "archiveSha256": "59ceb510d084a16b4ebf9176b52aa2ec4b167f5f64671b6105478b5d19b846f5",
+    "assets": {
+      "shape": {
+        "member": "DEB544B9-FEEC-4DE5-86B3-3344071282D4/Shape.png",
+        "sourceSha256": "af8c78465434818c393d39de33e20d3427e14939bd8b4225b9b843383488eeb6",
+        "outputSha256": "dd8037d440aa4413bd5838cbca0b02f935ec82cf2557d0760c00ceef81c14347",
+        "originalSize": [
+          2048,
+          2048
+        ],
+        "size": [
+          512,
+          512
+        ]
+      }
+    },
+    "settings": {
+      "plotSpacing": 0.0,
+      "shapeScatter": 2.0,
+      "plotJitter": 0.0,
+      "shapeRotation": 0.0,
+      "shapeAngle": 0.0,
+      "dynamicsPressureSize": 1.0,
+      "dynamicsPressureOpacity": 0.0,
+      "minSize": 0.020000001415610313,
+      "maxSize": 0.7774117588996887,
+      "minOpacity": 1.0,
+      "grainDepth": 1.0,
+      "shapeInverted": true,
+      "textureInverted": false
+    }
+  },
+  {
+    "id": "ttb-spray-06",
+    "archive": "06_Textures_Patterns_FX/Spray_Paint/Real_Spray_Paint.brushset",
+    "member": "00FF74C3-FB41-4371-9058-09F57ABD0E7C/Brush.archive",
+    "originalName": "TTB_Spray_06",
+    "archiveSha256": "339a1311b951dbdd04bd18d3281526d1cef6b886c4c609be779b173276a7c619",
+    "assets": {
+      "shape": {
+        "member": "00FF74C3-FB41-4371-9058-09F57ABD0E7C/Shape.png",
+        "sourceSha256": "a9ddfd3a70eae7a49760d2e8ccfe04d1fa7c2720bd92e97f05dd4eb6e77112fc",
+        "outputSha256": "bae57d6759848a091b077ad36b12a47baf57aae4ee51f5010001323734cca498",
+        "originalSize": [
+          2048,
+          2048
+        ],
+        "size": [
+          512,
+          512
+        ]
+      }
+    },
+    "settings": {
+      "plotSpacing": 0.09304523468017578,
+      "shapeScatter": 1.0,
+      "plotJitter": 0.0,
+      "shapeRotation": 1.0,
+      "dynamicsPressureSize": 0.5011671781539917,
+      "dynamicsPressureOpacity": 0.0,
+      "minSize": 0.14267191290855408,
+      "maxSize": 3.999516010284424,
+      "minOpacity": 0.0,
+      "shapeInverted": false,
+      "textureInverted": false
+    }
+  },
+  {
+    "id": "ttb-drip-07",
+    "archive": "06_Textures_Patterns_FX/Spray_Paint/Real_Spray_Paint.brushset",
+    "member": "0541D2CB-D98C-430B-A4BF-2DF4590FF632/Brush.archive",
+    "originalName": "TTB_Drip_07",
+    "archiveSha256": "339a1311b951dbdd04bd18d3281526d1cef6b886c4c609be779b173276a7c619",
+    "assets": {
+      "shape": {
+        "member": "0541D2CB-D98C-430B-A4BF-2DF4590FF632/Shape.png",
+        "sourceSha256": "352249ce06b604f13c9675f463405c33def0884f31d5855f74fb5e1a51e65b7d",
+        "outputSha256": "af94b625ff71b51ec839275ba892d8a5e1c86d62830ebbb7dfed3b54e5596ee0",
+        "originalSize": [
+          2048,
+          2048
+        ],
+        "size": [
+          512,
+          512
+        ]
+      }
+    },
+    "settings": {
+      "plotSpacing": 0.09304523468017578,
+      "shapeScatter": 0.0,
+      "plotJitter": 0.0,
+      "shapeRotation": 0.0,
+      "dynamicsPressureSize": 0.5011671781539917,
+      "dynamicsPressureOpacity": 0.0,
+      "minSize": 0.14267191290855408,
+      "maxSize": 5.995765686035156,
+      "minOpacity": 0.0,
+      "shapeInverted": false,
+      "textureInverted": false
+    }
+  },
+  {
+    "id": "ttb-spray-14",
+    "archive": "06_Textures_Patterns_FX/Spray_Paint/Real_Spray_Paint.brushset",
+    "member": "060C9244-BF29-4A81-93E2-5310DE5627CC/Brush.archive",
+    "originalName": "TTB_Spray_14",
+    "archiveSha256": "339a1311b951dbdd04bd18d3281526d1cef6b886c4c609be779b173276a7c619",
+    "assets": {
+      "shape": {
+        "member": "060C9244-BF29-4A81-93E2-5310DE5627CC/Shape.png",
+        "sourceSha256": "1e5826f34479d566ae325cce43dd77786de08cb852a39a80dfbceee13eb7ab3a",
+        "outputSha256": "1105f1ad0a0ebd89cef6cdf1dc5bb561947815fac18535eae97fa43b4b9ab462",
+        "originalSize": [
+          2048,
+          2048
+        ],
+        "size": [
+          512,
+          512
+        ]
+      }
+    },
+    "settings": {
+      "plotSpacing": 0.17722280323505402,
+      "shapeScatter": 1.0,
+      "plotJitter": 0.0,
+      "shapeRotation": 1.0,
+      "dynamicsPressureSize": 0.38376015424728394,
+      "dynamicsPressureOpacity": 0.0,
+      "minSize": 0.14267191290855408,
+      "maxSize": 3.999516010284424,
+      "minOpacity": 0.0,
+      "shapeInverted": false,
+      "textureInverted": false
+    }
+  },
+  {
+    "id": "ttb-spray-04",
+    "archive": "06_Textures_Patterns_FX/Spray_Paint/Real_Spray_Paint.brushset",
+    "member": "788CEBD3-C574-4C96-9803-0A2E7B489464/Brush.archive",
+    "originalName": "TTB_Spray_04",
+    "archiveSha256": "339a1311b951dbdd04bd18d3281526d1cef6b886c4c609be779b173276a7c619",
+    "assets": {
+      "shape": {
+        "member": "788CEBD3-C574-4C96-9803-0A2E7B489464/Shape.png",
+        "sourceSha256": "6fe0f03493138ad4af81d17774795ffa741c2d93f33f887821ac983a5ed3e4ca",
+        "outputSha256": "d546fe92f9050b65870e38a9c6e3d17b3f95cbaabf67002d1be60d974b23b09d",
+        "originalSize": [
+          2048,
+          2048
+        ],
+        "size": [
+          512,
+          512
+        ]
+      }
+    },
+    "settings": {
+      "plotSpacing": 0.050114769488573074,
+      "shapeScatter": 0.6073276996612549,
+      "plotJitter": 0.0,
+      "shapeRotation": 1.0,
+      "dynamicsPressureSize": 0.5011671781539917,
+      "dynamicsPressureOpacity": 0.0,
+      "minSize": 0.14267191290855408,
+      "maxSize": 3.999516010284424,
+      "minOpacity": 0.0,
+      "shapeInverted": false,
+      "textureInverted": false
+    }
+  }
+]
