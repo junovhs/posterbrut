@@ -32,8 +32,9 @@ const demo = ()=>{
 };
 let data = demo();
 let tool='select', zoom=.68, showGrid=false, brushSize=42, pointer=null, cursor={x:0,y:0}, isBusy=false;
-const printEngine=new ThresholdClient(),processing=new Map(),latestJobs=new Map(),lastFrames=new Map(),imageAnalysis=new Map(),analysisCache=new Map();
-let compareImageId=null,fxGesture=null;
+const printEngine=new ThresholdClient(),exportEngine=new ThresholdClient(),processing=new Map(),latestJobs=new Map(),lastFrames=new Map(),imageAnalysis=new Map(),analysisCache=new Map();
+let compareImageId=null,fxGesture=null,inkInteraction=false,inkRefineTimer;
+function refineInkPreview(){clearTimeout(inkRefineTimer);inkInteraction=false;schedule();}
 const images = new Map(), layerCache=new Map(), paperCache=new Map();
 let replacementTargetId=null,replacementSequence=0;
 let pendingFrame=0, history=[], future=[], lastHistory=0, toastTimer, autoStoreTimer, lassoPreview=[];
@@ -74,7 +75,7 @@ function newCanvas(w,h){const c=document.createElement('canvas');c.width=Math.ma
 function colorRGB(c){const el=document.createElement('canvas').getContext('2d');el.fillStyle=c;const normalized=el.fillStyle;let m=normalized.match(/^#([a-f0-9]{6})$/i);if(m)return [parseInt(m[1].slice(0,2),16),parseInt(m[1].slice(2,4),16),parseInt(m[1].slice(4,6),16)];m=normalized.match(/^#([a-f0-9]{3})$/i);if(m)return [...m[1]].map(x=>parseInt(x+x,16));return [0,0,0];}
 function requestRaster(slot,key,sourceKey,w,h,task,source,cache,finish){
   latestJobs.set(slot,key);if(cache.has(key)){if(analysisCache.has(key)){imageAnalysis.set(slot,analysisCache.get(key));updateAnalysisUI();}return Promise.resolve(cache.get(key));}if(processing.has(key))return processing.get(key);
-  const promise=printEngine.run(slot,sourceKey,w,h,task,source).then(result=>{
+  const promise=(slot.startsWith('export')?exportEngine:printEngine).run(slot,sourceKey,w,h,task,source).then(result=>{
     const c=newCanvas(w,h);c.getContext('2d').drawImage(result.bitmap,0,0);result.bitmap.close();if(finish)finish(c);
     cache.set(key,c);if(cache.size>22)cache.delete(cache.keys().next().value);
     if(latestJobs.get(slot)===key&&!slot.startsWith('export')&&(slot==='paper'||data.layers.some(l=>l.id===slot.replace(/^(text|stamp):/,'')))){lastFrames.set(slot,c);if(result.analysis){analysisCache.set(key,result.analysis);if(analysisCache.size>48)analysisCache.delete(analysisCache.keys().next().value);imageAnalysis.set(slot,result.analysis);updateAnalysisUI();}schedule();}
@@ -97,7 +98,7 @@ function applyMask(l,processed,w,h){const m=l.mask||defaultMask();if(m.type==='n
   const pc=processed.getContext('2d');pc.save();pc.globalCompositeOperation='destination-in';pc.drawImage(mask,0,0);pc.restore();
 }
 function processedImage(l,scale,preview=false,wait=false){const image=getImage(l.src);if(!image?.ready)return wait?image?.promise.then(()=>processedImage(l,scale,preview,true)):null;
-  const renderScale=preview?Math.min(1,zoom*(window.devicePixelRatio||1),1024/Math.max(l.w,l.h)):scale;
+  const renderScale=preview?Math.min(1,zoom*(window.devicePixelRatio||1),(inkInteraction&&selected()?.id===l.id?384:1024)/Math.max(l.w,l.h)):scale;
   const w=Math.max(1,Math.round(l.w*renderScale)),h=Math.max(1,Math.round(l.h*renderScale));
   const sourceKey=`${l.id}:${image.version}:${w}:${h}`,key=sourceKey+':'+JSON.stringify(l.fx)+':'+JSON.stringify(l.mask)+':'+data.canvas.seed;
   const fx={...l.fx,localRadius:Math.max(1,Math.round((l.fx.localRadius||16)*renderScale))},maskLayer=JSON.parse(JSON.stringify({...l,src:''}));
@@ -166,7 +167,7 @@ function fxControl(key,title,min,max,step=1,unit=''){
 function updateAnalysisUI(){const l=selected(),analysis=l&&imageAnalysis.get(l.id),status=$('#fx-status');if(!status)return;
   if(!analysis){status.textContent='Reading this image…';return;}
   status.textContent=`${Math.round(analysis.coverage)}% ink · ${l.name}`;
-  const bars=$('#fx-source-tones');if(bars){const hist=analysis.sourceHistogram,max=Math.max(1,...hist);bars.innerHTML=hist.map((count,i)=>`<rect x="${i}" y="${24-Math.sqrt(count/max)*24}" width="1" height="${Math.sqrt(count/max)*24}"/>`).join('');}
+  const bars=$('#fx-source-tones');if(bars&&(!bars.sourceHistogram||analysis.sourceHistogram.some((count,i)=>count!==bars.sourceHistogram[i]))){bars.sourceHistogram=analysis.sourceHistogram;const hist=analysis.sourceHistogram,max=Math.max(1,...hist);bars.innerHTML=hist.map((count,i)=>`<rect x="${i}" y="${24-Math.sqrt(count/max)*24}" width="1" height="${Math.sqrt(count/max)*24}"/>`).join('');}
 }
 function fxInspector(l){const x=l.fx.feelInk??.5,y=l.fx.feelTexture??.25;return section('INK FEEL',`
     <div class="ink-feel-heading"><span>Make your mark.</span><button class="ink-auto" id="fx-auto">↻ AUTO FIT</button></div>
@@ -207,10 +208,10 @@ function wireInspector(){inspector.querySelectorAll('[data-prop]').forEach(el=>{
   inspector.querySelectorAll('[data-action]').forEach(el=>el.addEventListener('click',()=>runAction(el.dataset.action)));
   updateAnalysisUI();
   const pad=$('#ink-pad');if(pad){let dragging=false,layer=null;
-    const apply=(x,y)=>{const l=selected();if(!l||l.locked)return;mutate(()=>{l.fx.feelInk=clamp(x,0,1);l.fx.feelTexture=clamp(y,0,1);latestJobs.delete(l.id);layerCache.clear();},{historyEntry:false});pad.style.setProperty('--ink-x',l.fx.feelInk*100+'%');pad.style.setProperty('--ink-y',l.fx.feelTexture*100+'%');$('#ink-amount').value=l.fx.feelInk*100;$('#ink-texture').value=l.fx.feelTexture*100;pad.querySelector('.ink-pad-caption').textContent='YOUR PRINT';};
+    const apply=(x,y)=>{const l=selected();if(!l||l.locked)return;inkInteraction=true;clearTimeout(inkRefineTimer);inkRefineTimer=setTimeout(refineInkPreview,140);mutate(()=>{l.fx.feelInk=clamp(x,0,1);l.fx.feelTexture=clamp(y,0,1);latestJobs.delete(l.id);},{historyEntry:false});pad.style.setProperty('--ink-x',l.fx.feelInk*100+'%');pad.style.setProperty('--ink-y',l.fx.feelTexture*100+'%');$('#ink-amount').value=l.fx.feelInk*100;$('#ink-texture').value=l.fx.feelTexture*100;pad.querySelector('.ink-pad-caption').textContent='YOUR PRINT';};
     const point=e=>{const r=pad.getBoundingClientRect();apply((e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height);};
     pad.onpointerdown=e=>{if(e.button!==0||selected()?.locked)return;e.preventDefault();pad.focus();remember(true);dragging=true;layer=selected();pad.setPointerCapture(e.pointerId);point(e);};
-    pad.onpointermove=e=>{if(dragging&&selected()===layer)point(e);};pad.onpointerup=pad.onpointercancel=()=>{dragging=false;};
+    pad.onpointermove=e=>{if(dragging&&selected()===layer)point(e);};pad.onpointerup=pad.onpointercancel=()=>{dragging=false;refineInkPreview();};
     pad.onkeydown=e=>{const delta={ArrowLeft:[-.02,0],ArrowRight:[.02,0],ArrowUp:[0,-.02],ArrowDown:[0,.02]}[e.key];if(!delta)return;e.preventDefault();e.stopPropagation();if(!e.repeat)remember(true);const l=selected();apply((l.fx.feelInk??.5)+delta[0]*(e.shiftKey?5:1),(l.fx.feelTexture??.25)+delta[1]*(e.shiftKey?5:1));};
     for(const [id,key] of [['ink-amount','feelInk'],['ink-texture','feelTexture']]){const input=$('#'+id);input.onpointerdown=input.onfocus=()=>remember(true);input.oninput=()=>{const l=selected();apply(key==='feelInk'?Number(input.value)/100:l.fx.feelInk??.5,key==='feelTexture'?Number(input.value)/100:l.fx.feelTexture??.25);};}
     const fit=()=>{if(selected()?.locked)return;remember(true);apply(.5,.25);};$('#fx-auto').onclick=fit;$('#fx-reset').onclick=fit;

@@ -20,7 +20,7 @@ export class ThresholdClient {
  }
  private receive(result:WorkResponse):void{const job=this.active;if(!job||result.id!==job.id){if('bitmap'in result)result.bitmap.close();return;}this.active=null;
   if('error'in result){if(result.error==='SOURCE_MISSING'&&!job.retried){this.known.delete(job.sourceKey);job.retried=true;this.queue.unshift(job);}else job.reject(new Error(result.error));}
-  else{if(job.task.kind==='image')this.known.add(job.sourceKey);this.stats.completed++;job.resolve(result);}void this.pump();
+  else{if(job.task.kind==='image'){this.known.delete(job.sourceKey);this.known.add(job.sourceKey);if(this.known.size>32)this.known.delete(this.known.values().next().value!);}this.stats.completed++;job.resolve(result);}void this.pump();
  }
 }
 export {defaults,effects} from './core.js';

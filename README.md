@@ -70,7 +70,7 @@ editor shell is JavaScript. A module worker owns source analysis and pixel loops
 the UI transports settings and paints finished bitmaps. Paper grain, text distress,
 and tinted stamp pixel passes also run in that worker. Sources have a bounded
 worker cache, previews are capped at 1024 pixels on the long edge, queued previews
-coalesce per layer, stale results are ignored, and export jobs have independent
+coalesce per layer, stale results are ignored, and export jobs use a separate worker and independent
 slots and render at the requested output size. Controls remain usable while the
 worker computes; there is no UI-thread pixel-processing fallback.
 
@@ -93,4 +93,4 @@ Ishoo's durable issue store remains synced separately from source on `refs/ishoo
 
 Select an image and drag the Ink feel pad: left/right changes how much ink prints; down adds worn grain and erosion. New images fit automatically. Auto fit recenters the pad; Hold original compares with the source. Arrow keys adjust the focused pad (Shift for larger moves). Print style and color live in one optional disclosure. The tone display describes the original selected source, using square-root scaling so smaller tone populations remain visible. Existing projects keep their exact older effect until you use the pad.
 
-The worker normalizes the source using alpha-aware 2nd/98th tone percentiles and maps ink amount to a tone percentile, so exposure varies without making the control unusable. Texture coordinates drive detail, grain, erosion and density together. Both coordinates are saved non-destructively in the project.
+The worker prepares source tones once using alpha-aware 2nd/98th percentiles, gentle local shadow/highlight balancing, and restrained detail enhancement. It caps gain on nearly flat sources and ignores hidden RGB around transparent cutouts. Ink amount maps to a balanced tone percentile, so exposure varies without making the control unusable. Balanced tones and seeded texture fields are cached; moving only ink amount reuses both. During a gesture previews use at most 384 pixels on the long edge, then refine to the normal 1024-pixel limit after release or 140 ms of inactivity. Full-resolution export uses a separate worker so it cannot hold up preview jobs. Texture coordinates drive detail, grain, erosion and density together. Both coordinates are saved non-destructively in the project.

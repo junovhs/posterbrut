@@ -13,7 +13,7 @@ scope.onmessage=(event:MessageEvent<WorkRequest>)=>{
    const source=sources.get(job.sourceKey);if(!source)throw new Error('SOURCE_MISSING');
    // LRU source storage is bounded by pixel area, not just number of images.
    sources.delete(job.sourceKey);sources.set(job.sourceKey,source);
-   while([...sources.values()].reduce((sum,s)=>sum+s.frame.width*s.frame.height,0)>8_000_000&&sources.size>1)sources.delete(sources.keys().next().value!);
+   while([...sources.values()].reduce((sum,s)=>sum+s.frame.width*s.frame.height,0)>4_000_000&&sources.size>1)sources.delete(sources.keys().next().value!);
    const output=source.render(job.task.fx,job.task.seed);analysis=output.analysis;ctx.putImageData(new ImageData(output.rgba,job.width,job.height),0,0);
   }else if(job.task.kind==='paper'){
    const {amount,seed}=job.task,pixels=ctx.createImageData(job.width,job.height),a=pixels.data;
